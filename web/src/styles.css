@@ -986,3 +986,7 @@ tr:last-child td { border-bottom: none; }
 .retro-advanced[open] > summary::before { content: "▾ "; }
 .retro-advanced > summary:hover { color: var(--ink, #191510); }
 .retro-advanced .retro-field { margin-top: 12px; }
+
+/* Chat — lista de CLIs do escopo de busca */
+.chat-cli-list { list-style: none; margin: 6px 0 0; padding: 0; display: flex; flex-wrap: wrap; gap: 8px 14px; }
+.chat-cli-list li { min-width: 0; }

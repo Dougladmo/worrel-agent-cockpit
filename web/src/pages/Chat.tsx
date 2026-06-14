@@ -14,7 +14,7 @@ import {
   type CreatedSuggestion,
 } from '../chatApi';
 
-const WINDOW_PRESETS = [0, 30, 60, 90]; // 0 = tudo
+const WINDOW_PRESETS = [7, 14, 30, 60, 90, 0]; // 0 = tudo
 const PROVIDERS = ['', 'claude-code', 'opencode', 'gemini', 'codex', 'pidev'];
 
 function providerLabel(p: string, t: (k: string) => string): string {
@@ -99,6 +99,7 @@ export default function Chat() {
   // Escopo / config
   const [projects, setProjects] = useState<Project[]>([]);
   const [projectId, setProjectId] = useState('');
+  const [excludedClis, setExcludedClis] = useState<Record<string, boolean>>({}); // CLIs fora da busca
   const [windowDays, setWindowDays] = useState(0);
   const [provider, setProvider] = useState('');
   const [model, setModel] = useState('');
@@ -174,10 +175,13 @@ export default function Chat() {
   async function startNewThread() {
     setErr(null);
     try {
-      const scope =
-        projectId || windowDays
-          ? { project_id: projectId || undefined, window_days: windowDays || undefined }
-          : undefined;
+      const includedClis = PROVIDERS.filter(Boolean).filter((c) => !excludedClis[c]);
+      const allClis = PROVIDERS.filter(Boolean).length;
+      const scope = {
+        project_id: projectId || undefined,
+        window_days: windowDays || undefined,
+        clis: includedClis.length < allClis ? includedClis : undefined,
+      };
       const th = await createThread({ scope, provider: provider || undefined, model: model.trim() || undefined });
       setThreads((prev) => [th, ...prev.filter((p) => p.id !== th.id)]);
       setActiveId(th.id);
@@ -191,10 +195,13 @@ export default function Chat() {
   async function ensureThread(): Promise<string | null> {
     if (activeId) return activeId;
     try {
-      const scope =
-        projectId || windowDays
-          ? { project_id: projectId || undefined, window_days: windowDays || undefined }
-          : undefined;
+      const includedClis = PROVIDERS.filter(Boolean).filter((c) => !excludedClis[c]);
+      const allClis = PROVIDERS.filter(Boolean).length;
+      const scope = {
+        project_id: projectId || undefined,
+        window_days: windowDays || undefined,
+        clis: includedClis.length < allClis ? includedClis : undefined,
+      };
       const th = await createThread({ scope, provider: provider || undefined, model: model.trim() || undefined });
       setThreads((prev) => [th, ...prev.filter((p) => p.id !== th.id)]);
       setActiveId(th.id);
@@ -222,11 +229,16 @@ export default function Chat() {
     setSending(true);
     try {
       const res = await sendMessage(tid, { text: trimmed, provider: provider || undefined, model: model.trim() || undefined });
+      // Contrato do backend: { assistant: string, sources: [...], created_suggestions: [...] }.
+      const assistantText = typeof res.assistant === 'string'
+        ? res.assistant
+        : (res.assistant?.content ?? '');
       const assistant: ChatMessage = {
-        ...res.assistant,
+        seq: userMsg.seq + 1,
         role: 'assistant',
-        sources: res.assistant?.sources ?? res.sources ?? [],
-        created_suggestions: res.assistant?.created_suggestions ?? res.created_suggestions ?? [],
+        content: assistantText,
+        sources: res.sources ?? [],
+        created_suggestions: res.created_suggestions ?? [],
       };
       setMessages((m) => [...m, assistant]);
       // Atualiza a lista de threads (contagem/título podem ter mudado).
@@ -276,9 +288,28 @@ export default function Chat() {
           <section className="chat-scope" aria-label={t('chat.scope.title')}>
             <div className="chat-scope-head muted">{t('chat.scope.title')}</div>
 
+            {/* Quais CLIs entram na busca do histórico (o chat pesquisa as sessões). */}
             <div className="retro-field">
-              <label htmlFor="chat-project">{t('chat.scope.project')}</label>
-              <select id="chat-project" value={projectId} onChange={(e) => setProjectId(e.target.value)}>
+              <span className="retro-field-label">{t('chat.scope.include')}</span>
+              <ul className="chat-cli-list">
+                {PROVIDERS.filter(Boolean).map((c) => (
+                  <li key={c}>
+                    <label className="retro-inv-toggle">
+                      <input
+                        type="checkbox"
+                        checked={!excludedClis[c]}
+                        onChange={(e) => setExcludedClis((m) => ({ ...m, [c]: !e.target.checked }))}
+                      />
+                      <span className="mono">{c === 'pidev' ? 'pi' : c}</span>
+                    </label>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            <div className="retro-field">
+              <label htmlFor="chat-project">{t('chat.scope.project')} <span className="faint">({t('chat.scope.modelOptional')})</span></label>
+              <select className="retro-select" id="chat-project" value={projectId} onChange={(e) => setProjectId(e.target.value)}>
                 <option value="">{t('chat.scope.allProjects')}</option>
                 {projects.map((p) => (
                   <option key={p.id} value={p.id}>{p.name}</option>
@@ -303,9 +334,10 @@ export default function Chat() {
               </div>
             </div>
 
+            <div className="chat-scope-head muted" style={{ marginTop: 6 }}>{t('chat.scope.engine')}</div>
             <div className="retro-field">
               <label htmlFor="chat-provider">{t('chat.scope.provider')}</label>
-              <select id="chat-provider" value={provider} onChange={(e) => setProvider(e.target.value)}>
+              <select className="retro-select" id="chat-provider" value={provider} onChange={(e) => setProvider(e.target.value)}>
                 {PROVIDERS.map((p) => (
                   <option key={p || 'default'} value={p}>{providerLabel(p, t)}</option>
                 ))}
