@@ -10,7 +10,7 @@ import {
 } from '../retroApi';
 import RetroBatchReview from './RetroBatchReview';
 
-const WINDOW_PRESETS = [30, 60, 90, 0]; // 0 = tudo
+const WINDOW_PRESETS = [7, 14, 30, 60, 90, 0]; // 0 = tudo
 const PROVIDERS = ['', 'claude-code', 'opencode', 'gemini', 'codex', 'pidev'];
 
 type StageKey = 'inventory' | 'scope' | 'map' | 'execution' | 'review';
@@ -65,6 +65,7 @@ export default function RetroWizard() {
   const [modelsLoading, setModelsLoading] = useState(false);
   const [modelFreeText, setModelFreeText] = useState(false);
   const [budgetPerHour, setBudgetPerHour] = useState(0);
+  const [excludedClis, setExcludedClis] = useState<Record<string, boolean>>({}); // CLIs desmarcados (fora do histórico)
   const [run, setRun] = useState<RetroRun | null>(null);
   const [clusters, setClusters] = useState<RetroCluster[]>([]);
   const [selected, setSelected] = useState<string[]>([]);
@@ -121,7 +122,7 @@ export default function RetroWizard() {
 
   async function openRun() {
     const scope: Scope = {
-      clis: Object.keys(report?.per_cli ?? {}),
+      clis: Object.keys(report?.per_cli ?? {}).filter((c) => !excludedClis[c]),
       dirs: [],
       window_days: windowDays,
       adapter: provider,
@@ -193,39 +194,7 @@ export default function RetroWizard() {
             <p className="muted">{t('retro.wizard.scopeSubtitle')}</p>
           </header>
 
-          {/* Inventário */}
-          <div className="retro-field">
-            <span className="retro-field-label">{t('retro.wizard.inventoryTitle')}</span>
-            {loadingInventory ? (
-              <div className="retro-inventory-panel muted">
-                <span className="pulse">{t('retro.wizard.inventoryLoading')}</span>
-              </div>
-            ) : cliEntries.length === 0 ? (
-              <div className="retro-inventory-panel muted">{t('retro.wizard.inventoryEmpty')}</div>
-            ) : (
-              <div className="retro-inventory-panel">
-                <ul className="retro-inventory">
-                  {cliEntries.map(([cli, ci]) => (
-                    <li key={cli}>
-                      <span className="retro-inv-cli mono">{cli}</span>
-                      <span className="retro-inv-meta">
-                        {ci.sessions} {t('retro.wizard.sessions')}
-                        <span className="faint"> · {ci.already_known} {t('retro.wizard.known')}</span>
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-                {report && (
-                  <div className="retro-estimate">
-                    <span className="muted">{t('retro.wizard.estimate')}</span>
-                    <strong className="mono">{report.estimated_invocations}</strong>
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Janela: segmented control */}
+          {/* Janela: segmented control — PRIMEIRA info (define o recorte do histórico) */}
           <div className="retro-field">
             <span className="retro-field-label">{t('retro.wizard.window')}</span>
             <div className="retro-segmented" role="group" aria-label={t('retro.wizard.window')}>
@@ -241,6 +210,48 @@ export default function RetroWizard() {
                 </button>
               ))}
             </div>
+          </div>
+
+          {/* Inventário + seleção de quais CLIs entram no histórico */}
+          <div className="retro-field">
+            <span className="retro-field-label">{t('retro.wizard.inventoryTitle')}</span>
+            {loadingInventory ? (
+              <div className="retro-inventory-panel muted">
+                <span className="pulse">{t('retro.wizard.inventoryLoading')}</span>
+              </div>
+            ) : cliEntries.length === 0 ? (
+              <div className="retro-inventory-panel muted">{t('retro.wizard.inventoryEmpty')}</div>
+            ) : (
+              <div className="retro-inventory-panel">
+                <ul className="retro-inventory">
+                  {cliEntries.map(([cli, ci]) => (
+                    <li key={cli}>
+                      <label className="retro-inv-toggle">
+                        <input
+                          type="checkbox"
+                          checked={!excludedClis[cli]}
+                          onChange={(e) =>
+                            setExcludedClis((m) => ({ ...m, [cli]: !e.target.checked }))
+                          }
+                        />
+                        <span className="retro-inv-cli mono">{cli === 'pidev' ? 'pi' : cli}</span>
+                      </label>
+                      <span className="retro-inv-meta">
+                        {ci.sessions} {t('retro.wizard.sessions')}
+                        <span className="faint"> · {ci.already_known} {t('retro.wizard.known')}</span>
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+                <span className="retro-field-hint">{t('retro.wizard.includeHint')}</span>
+                {report && (
+                  <div className="retro-estimate">
+                    <span className="muted">{t('retro.wizard.estimate')}</span>
+                    <strong className="mono">{report.estimated_invocations}</strong>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Profundidade */}
@@ -271,7 +282,7 @@ export default function RetroWizard() {
           <div className="retro-grid-2">
             <div className="retro-field">
               <label htmlFor="retro-provider">{t('retro.wizard.provider')}</label>
-              <select id="retro-provider" value={provider} onChange={(e) => setProvider(e.target.value)}>
+              <select className="retro-select" id="retro-provider" value={provider} onChange={(e) => setProvider(e.target.value)}>
                 {PROVIDERS.map((p) => (
                   <option key={p || 'default'} value={p}>
                     {p === '' ? t('retro.wizard.providerDefault') : p === 'pidev' ? 'pi' : p}
@@ -287,6 +298,7 @@ export default function RetroWizard() {
                 <div className="retro-inline-loading muted pulse">{t('retro.wizard.modelLoading')}</div>
               ) : models.length > 0 && !modelFreeText ? (
                 <select
+                  className="retro-select"
                   id="retro-model"
                   value={model}
                   onChange={(e) => {
@@ -319,18 +331,21 @@ export default function RetroWizard() {
             </div>
           </div>
 
-          {/* Orçamento */}
-          <div className="retro-field">
-            <label htmlFor="retro-budget">{t('retro.wizard.budgetPerHour')}</label>
-            <input
-              id="retro-budget"
-              type="number"
-              min={0}
-              value={budgetPerHour}
-              onChange={(e) => setBudgetPerHour(Number(e.target.value))}
-            />
-            <span className="retro-field-hint">{t('retro.wizard.budgetPerHourHint')}</span>
-          </div>
+          {/* Avançado: limite de chamadas/hora (oculto por padrão; raramente necessário) */}
+          <details className="retro-advanced">
+            <summary>{t('retro.wizard.advanced')}</summary>
+            <div className="retro-field">
+              <label htmlFor="retro-budget">{t('retro.wizard.budgetPerHour')}</label>
+              <input
+                id="retro-budget"
+                type="number"
+                min={0}
+                value={budgetPerHour}
+                onChange={(e) => setBudgetPerHour(Number(e.target.value))}
+              />
+              <span className="retro-field-hint">{t('retro.wizard.budgetPerHourHint')}</span>
+            </div>
+          </details>
 
           <div className="retro-card-foot">
             <button className="btn btn-accent" onClick={openRun} disabled={cliEntries.length === 0}>
