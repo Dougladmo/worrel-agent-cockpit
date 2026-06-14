@@ -26,6 +26,7 @@ i18next
             loading: 'Loading thread…',
             scope: {
               title: 'Scope', project: 'Project', allProjects: 'All projects',
+              include: 'Include history from', engine: 'Chat engine',
               window: 'Window', allTime: 'All time', provider: 'Provider', providerDefault: 'Default',
               model: 'Model', modelOptional: 'optional', modelLoading: 'Loading models…',
               modelSelectPlaceholder: 'Select a model', modelCustom: 'Other (type)…',
@@ -416,6 +417,7 @@ i18next
             loading: 'Carregando conversa…',
             scope: {
               title: 'Escopo', project: 'Projeto', allProjects: 'Todos os projetos',
+              include: 'Incluir histórico de', engine: 'Motor do chat',
               window: 'Janela', allTime: 'Tudo', provider: 'Provedor', providerDefault: 'Padrão',
               model: 'Modelo', modelOptional: 'opcional', modelLoading: 'Carregando modelos…',
               modelSelectPlaceholder: 'Selecione um modelo', modelCustom: 'Outro (digitar)…',
