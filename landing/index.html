@@ -7,7 +7,7 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>worrel — agent cockpit · camada de memória local para CLIs agênticos</title>
-<meta name="description" content="worrel é um painel local-first que observa suas sessões de Claude Code, OpenCode e outros CLIs agênticos e destila Projetos, Memórias e Skills versionadas. 100% local, privado, sem telemetria." />
+<meta name="description" content="worrel é um painel local-first que observa suas sessões de Claude Code, OpenCode, Gemini, Codex e Pi e destila Projetos, Memórias, Skills e Pipelines — com chat de destilação. 100% local, privado, sem telemetria." />
 <meta name="color-scheme" content="light" />
 <meta name="theme-color" content="#fbf8f1" />
 
@@ -82,10 +82,10 @@
         O cockpit <span class="under">lembra por eles.</span>
       </h1>
       <p class="lede reveal d2">
-        worrel observa suas sessões de Claude&nbsp;Code, OpenCode e outros CLIs agênticos,
+        worrel observa suas sessões de Claude&nbsp;Code, OpenCode, Gemini, Codex e Pi,
         identifica o que foi feito, o que falhou e o que se repete — e destila tudo em
-        <strong>Projetos, Memórias e Skills</strong> versionadas, prontas para reinjetar
-        em qualquer sessão nova.
+        <strong>Projetos, Memórias, Skills e Pipelines</strong> versionados, prontos para
+        reinjetar em qualquer sessão nova.
       </p>
       <div class="hero-actions reveal d3">
         <a class="btn btn-solid btn-lg" href="https://github.com/eduardoworrel/worrel-agent-cockpit" rel="noopener">
@@ -157,13 +157,13 @@
   <!-- ░░ MARQUEE ░░ -->
   <div class="marquee" aria-hidden="true">
     <div class="marquee-track">
-      <span>Claude&nbsp;Code</span><span class="sep">/</span><span>OpenCode</span><span class="sep">/</span>
-      <span>MCP&nbsp;server&nbsp;embutido</span><span class="sep">/</span><span>SQLite&nbsp;local</span><span class="sep">/</span>
-      <span>AES-256-GCM</span><span class="sep">/</span><span>handoff&nbsp;de&nbsp;contexto</span><span class="sep">/</span>
+      <span>Claude&nbsp;Code</span><span class="sep">/</span><span>OpenCode</span><span class="sep">/</span><span>Gemini</span><span class="sep">/</span><span>Codex</span><span class="sep">/</span><span>Pi</span><span class="sep">/</span>
+      <span>chat&nbsp;de&nbsp;destilação</span><span class="sep">/</span><span>pipelines&nbsp;de&nbsp;skills</span><span class="sep">/</span><span>MCP&nbsp;server</span><span class="sep">/</span>
+      <span>SQLite&nbsp;local</span><span class="sep">/</span><span>AES-256-GCM</span><span class="sep">/</span><span>handoff&nbsp;de&nbsp;contexto</span><span class="sep">/</span>
       <span>linhagem&nbsp;de&nbsp;skills</span><span class="sep">/</span><span>análise&nbsp;retroativa</span><span class="sep">/</span>
-      <span>Claude&nbsp;Code</span><span class="sep">/</span><span>OpenCode</span><span class="sep">/</span>
-      <span>MCP&nbsp;server&nbsp;embutido</span><span class="sep">/</span><span>SQLite&nbsp;local</span><span class="sep">/</span>
-      <span>AES-256-GCM</span><span class="sep">/</span><span>handoff&nbsp;de&nbsp;contexto</span><span class="sep">/</span>
+      <span>Claude&nbsp;Code</span><span class="sep">/</span><span>OpenCode</span><span class="sep">/</span><span>Gemini</span><span class="sep">/</span><span>Codex</span><span class="sep">/</span><span>Pi</span><span class="sep">/</span>
+      <span>chat&nbsp;de&nbsp;destilação</span><span class="sep">/</span><span>pipelines&nbsp;de&nbsp;skills</span><span class="sep">/</span><span>MCP&nbsp;server</span><span class="sep">/</span>
+      <span>SQLite&nbsp;local</span><span class="sep">/</span><span>AES-256-GCM</span><span class="sep">/</span><span>handoff&nbsp;de&nbsp;contexto</span><span class="sep">/</span>
       <span>linhagem&nbsp;de&nbsp;skills</span><span class="sep">/</span><span>análise&nbsp;retroativa</span><span class="sep">/</span>
     </div>
   </div>
@@ -229,7 +229,7 @@
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><rect x="3" y="4" width="7" height="16" rx="1.5"/><rect x="14" y="4" width="7" height="16" rx="1.5"/><path d="M6.5 8v4M17.5 8v8"/></svg>
         </span>
         <h3>Multi-CLI por adaptadores</h3>
-        <p>Camada de adaptadores com interface comum. A v1 entrega <strong>Claude&nbsp;Code</strong> e <strong>OpenCode</strong> completos; a arquitetura aceita novos CLIs sem tocar no núcleo.</p>
+        <p>Cinco CLIs suportados — <strong>Claude&nbsp;Code</strong>, <strong>OpenCode</strong>, <strong>Gemini</strong>, <strong>Codex</strong> e <strong>Pi</strong> — via camada de adaptadores com interface comum; a arquitetura aceita novos sem tocar no núcleo.</p>
       </article>
 
       <article class="feat reveal-up">
@@ -262,6 +262,22 @@
         </span>
         <h3>Análise retroativa <span class="tag-ver">v3</span></h3>
         <p>"Analisar tudo" varre todo o histórico já existente dos seus CLIs, propõe projetos e destila skills e memórias do passado — com <strong>controle estrito de orçamento</strong> de quota para você nunca ser surpreendido.</p>
+      </article>
+
+      <article class="feat reveal-up">
+        <span class="feat-ico" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><path d="M4 5h16v11H8l-4 4z"/><path d="M8 9h8M8 12h5"/></svg>
+        </span>
+        <h3>Chat de destilação</h3>
+        <p>Converse com a memória das suas sessões: "que skills valem do meu fluxo de deploy?". A IA lê o histórico (segredos redigidos) e propõe <strong>skills, memórias, projetos e pipelines</strong> — tudo entra na fila de aprovação.</p>
+      </article>
+
+      <article class="feat reveal-up">
+        <span class="feat-ico" aria-hidden="true">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7"><circle cx="6" cy="6" r="2"/><circle cx="6" cy="18" r="2"/><circle cx="18" cy="12" r="2"/><path d="M6 8v8M8 6h6a2 2 0 0 1 2 2v2M8 18h6a2 2 0 0 0 2-2v-2"/></svg>
+        </span>
+        <h3>Pipelines de skills</h3>
+        <p>Encadeie skills numa sequência reutilizável — pelo construtor ou conversando. Inicie uma sessão a partir de um pipeline (ou skill) e o conteúdo já entra <strong>injetado no contexto inicial</strong>.</p>
       </article>
 
       <article class="feat reveal-up">
