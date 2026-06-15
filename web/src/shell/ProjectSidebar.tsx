@@ -32,6 +32,7 @@ interface Props {
 export default function ProjectSidebar({ projects, wrapperSessions, liveIds, onStarted, onAnalyzeHistory }: Props) {
   const { t } = useTranslation();
   const [openFor, setOpenFor] = useState<string | null>(null); // null = nenhum dropdown aberto
+  const [anchor, setAnchor] = useState<{ top: number; left: number } | null>(null);
   const live = wrapperSessions.filter((s) => liveIds.has(s.id));
   const byProject = (pid: string) => live.filter((s) => s.project_id === pid);
   const orphans = live.filter((s) => !s.project_id);
@@ -53,12 +54,17 @@ export default function ProjectSidebar({ projects, wrapperSessions, liveIds, onS
           <button
             className="sidebar-new-btn"
             aria-label={t('sidebar.newSessionIn', { name })}
-            onClick={() => setOpenFor(openFor === id ? null : id)}
+            onClick={(e) => {
+              if (openFor === id) { setOpenFor(null); return; }
+              const r = e.currentTarget.getBoundingClientRect();
+              setAnchor({ top: r.bottom + 4, left: r.left });
+              setOpenFor(id);
+            }}
           >＋</button>
-          {openFor === id && (
+          {openFor === id && anchor && (
             <NewSessionDropdown
               projectId={dropdownProjectId}
-              projectName={name}
+              anchor={anchor}
               onClose={() => setOpenFor(null)}
               onStarted={handleStarted}
             />
