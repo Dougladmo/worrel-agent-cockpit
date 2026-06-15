@@ -96,6 +96,25 @@ func TestInventorySkipsMetaSessions(t *testing.T) {
 	}
 }
 
+func TestScanCollectsSessionsMs(t *testing.T) {
+	s := newStore(t)
+	t1 := time.Now().Add(-10 * 24 * time.Hour)
+	t2 := time.Now().Add(-3 * 24 * time.Hour)
+	obs := &fakeObs{id: "claude-code", sess: []adapter.ExternalSession{
+		{Adapter: "claude-code", ExternalRef: "a", Dir: "/x", UpdatedAt: t1},
+		{Adapter: "claude-code", ExternalRef: "b", Dir: "/x", UpdatedAt: t2},
+	}}
+	inv := NewInventory(s, []Observer{obs})
+	rep, err := inv.Scan(time.Time{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ci := rep.PerCLI["claude-code"]
+	if ci == nil || len(ci.SessionsMs) != 2 {
+		t.Fatalf("SessionsMs = %v, want 2 timestamps", ci)
+	}
+}
+
 func writeCCSession(t *testing.T, root, dirEnc, sessID, firstUser string) {
 	t.Helper()
 	d := filepath.Join(root, dirEnc)

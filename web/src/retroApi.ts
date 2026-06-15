@@ -17,6 +17,7 @@ export interface CLIInventory {
   already_known: number;
   oldest_ms: number;
   newest_ms: number;
+  sessions_ms: number[];
 }
 
 export interface FolderGroup {
@@ -71,6 +72,8 @@ export interface Scope {
   window_days: number;
   adapter?: string;
   model?: string;
+  since?: number;
+  until?: number;
 }
 
 export interface Suggestion {
@@ -118,10 +121,17 @@ export async function listAdapterModels(provider: string): Promise<string[]> {
   }
 }
 
-export function inventory(windowDays = 0): Promise<InventoryReport> {
+// listRetroProviders lista os provedores disponíveis SEM varrer o histórico.
+export function listRetroProviders(): Promise<string[]> {
+  return req('/retro/providers');
+}
+
+// inventory varre o histórico. clis (se informado) restringe aos provedores
+// aprovados — o scan só roda após aprovação explícita na UI.
+export function inventory(windowDays = 0, clis?: string[]): Promise<InventoryReport> {
   return req('/retro/inventory', {
     method: 'POST',
-    body: JSON.stringify({ window_days: windowDays }),
+    body: JSON.stringify({ window_days: windowDays, clis: clis ?? [] }),
   });
 }
 

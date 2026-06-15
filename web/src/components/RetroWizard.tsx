@@ -3,18 +3,20 @@ import { useTranslation } from 'react-i18next';
 import { useEvents } from '../useEvents';
 import type { WsEvent } from '../useEvents';
 import {
-  inventory, createRun, cluster, listClusters, approveCluster, discardCluster,
+  inventory, listRetroProviders, createRun, cluster, listClusters, approveCluster, discardCluster,
   mergeClusters, startRun, pauseRun, resumeRun, cancelRun, getRun, listAdapterModels,
   type InventoryReport, type RetroRun, type RetroCluster, type Scope,
   type RetroRunProgress,
 } from '../retroApi';
 import RetroBatchReview from './RetroBatchReview';
+import RetroRangePicker, { type RangeValue } from './RetroRangePicker';
 
-const WINDOW_PRESETS = [7, 14, 30, 60, 90, 0]; // 0 = tudo
 const PROVIDERS = ['', 'claude-code', 'opencode', 'gemini', 'codex', 'pidev'];
 
-type StageKey = 'inventory' | 'scope' | 'map' | 'execution' | 'review';
-const STAGE_ORDER: StageKey[] = ['inventory', 'scope', 'map', 'execution', 'review'];
+type StageKey = 'scope' | 'map' | 'execution' | 'review';
+// O inventário deixou de ser um passo próprio (foi fundido no Escopo: provedores
+// + período). O fluxo começa em Escopo.
+const STAGE_ORDER: StageKey[] = ['scope', 'map', 'execution', 'review'];
 
 function stageFromStatus(run: RetroRun | null): StageKey {
   if (!run) return 'scope';
@@ -55,9 +57,12 @@ function Stepper({ active }: { active: StageKey }) {
 
 export default function RetroWizard() {
   const { t } = useTranslation();
+  // report ACUMULA só os provedores varridos (após aprovação). Começa vazio.
   const [report, setReport] = useState<InventoryReport | null>(null);
-  const [loadingInventory, setLoadingInventory] = useState(true);
-  const [windowDays, setWindowDays] = useState(0); // "Tudo" por padrão — bate com o Dashboard
+  const [providers, setProviders] = useState<string[]>([]);
+  const [scanning, setScanning] = useState<Record<string, boolean>>({});
+  const [estByCli, setEstByCli] = useState<Record<string, number>>({});
+  const [range, setRange] = useState<RangeValue>({ since: 0, until: 0 });
   const [depth, setDepth] = useState<'completa' | 'leve'>('completa');
   const [provider, setProvider] = useState('');
   const [model, setModel] = useState('');
@@ -65,7 +70,9 @@ export default function RetroWizard() {
   const [modelsLoading, setModelsLoading] = useState(false);
   const [modelFreeText, setModelFreeText] = useState(false);
   const [budgetPerHour, setBudgetPerHour] = useState(0);
-  const [excludedClis, setExcludedClis] = useState<Record<string, boolean>>({}); // CLIs desmarcados (fora do histórico)
+  // Permissões por provedor: default TUDO desligado. NADA é varrido até o usuário
+  // liberar (aprovar) explicitamente um provedor — aí varremos só aquele.
+  const [excludedClis, setExcludedClis] = useState<Record<string, boolean>>({});
   const [run, setRun] = useState<RetroRun | null>(null);
   const [clusters, setClusters] = useState<RetroCluster[]>([]);
   const [selected, setSelected] = useState<string[]>([]);
@@ -73,20 +80,42 @@ export default function RetroWizard() {
   const [clustering, setClustering] = useState(false);
   const [progress, setProgress] = useState<RetroRunProgress | null>(null);
 
-  const refreshInventory = useCallback(async () => {
-    setLoadingInventory(true);
+  // Carrega só a LISTA de provedores (sem varrer histórico), todos desligados.
+  useEffect(() => {
+    listRetroProviders()
+      .then((ps) => {
+        setProviders(ps);
+        setExcludedClis((prev) => {
+          if (Object.keys(prev).length > 0) return prev;
+          const off: Record<string, boolean> = {};
+          ps.forEach((c) => { off[c] = true; });
+          return off;
+        });
+      })
+      .catch((e) => setErr(String(e)));
+  }, []);
+
+  // toggleProvider libera/revoga um provedor. Ao LIBERAR pela 1ª vez, varre SÓ
+  // aquele provedor e mescla o resultado no report.
+  async function toggleProvider(cli: string, enable: boolean) {
+    setExcludedClis((m) => ({ ...m, [cli]: !enable }));
+    if (!enable || report?.per_cli?.[cli]) return;
+    setScanning((m) => ({ ...m, [cli]: true }));
     try {
-      setReport(await inventory(windowDays));
+      const rep = await inventory(0, [cli]);
+      const ci = rep.per_cli?.[cli];
+      setReport((prev) => ({
+        per_cli: { ...(prev?.per_cli ?? {}), ...(ci ? { [cli]: ci } : {}) },
+        folders: [...(prev?.folders ?? []), ...(rep.folders ?? [])],
+        estimated_invocations: 0,
+      }));
+      setEstByCli((m) => ({ ...m, [cli]: rep.estimated_invocations }));
     } catch (e) {
       setErr(String(e));
     } finally {
-      setLoadingInventory(false);
+      setScanning((m) => ({ ...m, [cli]: false }));
     }
-  }, [windowDays]);
-
-  useEffect(() => {
-    refreshInventory();
-  }, [refreshInventory]);
+  }
 
   // Busca modelos do provider; degrada para texto livre se vazio/404.
   useEffect(() => {
@@ -122,9 +151,11 @@ export default function RetroWizard() {
 
   async function openRun() {
     const scope: Scope = {
-      clis: Object.keys(report?.per_cli ?? {}).filter((c) => !excludedClis[c]),
+      clis: providers.filter((c) => !excludedClis[c]),
       dirs: [],
-      window_days: windowDays,
+      window_days: 0,
+      since: range.since,
+      until: range.until,
       adapter: provider,
       model: model.trim(),
     };
@@ -167,7 +198,7 @@ export default function RetroWizard() {
 
   async function execute() {
     if (!run) return;
-    const invocations = report?.estimated_invocations ?? '?';
+    const invocations = estimate || '?';
     const budget = budgetPerHour === 0 ? t('retro.wizard.unlimited') : String(budgetPerHour);
     const depthLabel = depth === 'completa' ? t('retro.wizard.depthFull') : t('retro.wizard.depthLight');
     if (!window.confirm(t('retro.wizard.confirmRun', { invocations, budget, depth: depthLabel }))) return;
@@ -178,7 +209,8 @@ export default function RetroWizard() {
   const status = run?.status ?? 'inventoried';
   const stage = stageFromStatus(run);
 
-  const cliEntries = Object.entries(report?.per_cli ?? {});
+  const enabledClis = providers.filter((c) => !excludedClis[c]);
+  const estimate = enabledClis.reduce((sum, c) => sum + (estByCli[c] ?? 0), 0);
 
   return (
     <div className="retro-wizard">
@@ -194,65 +226,67 @@ export default function RetroWizard() {
             <p className="muted">{t('retro.wizard.scopeSubtitle')}</p>
           </header>
 
-          {/* Janela: segmented control — PRIMEIRA info (define o recorte do histórico) */}
+          {/* 1º) Provedores — permissões: libere o histórico a analisar (default OFF).
+              NADA é varrido antes de liberar; ao liberar, varremos só aquele provedor. */}
           <div className="retro-field">
-            <span className="retro-field-label">{t('retro.wizard.window')}</span>
-            <div className="retro-segmented" role="group" aria-label={t('retro.wizard.window')}>
-              {WINDOW_PRESETS.map((w) => (
-                <button
-                  key={w}
-                  type="button"
-                  className={`retro-seg ${windowDays === w ? 'active' : ''}`}
-                  aria-pressed={windowDays === w}
-                  onClick={() => setWindowDays(w)}
-                >
-                  {w === 0 ? t('retro.wizard.all') : `${w}d`}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {/* Inventário + seleção de quais CLIs entram no histórico */}
-          <div className="retro-field">
-            <span className="retro-field-label">{t('retro.wizard.inventoryTitle')}</span>
-            {loadingInventory ? (
-              <div className="retro-inventory-panel muted">
-                <span className="pulse">{t('retro.wizard.inventoryLoading')}</span>
-              </div>
-            ) : cliEntries.length === 0 ? (
+            <span className="retro-field-label">{t('retro.wizard.providersTitle')}</span>
+            {providers.length === 0 ? (
               <div className="retro-inventory-panel muted">{t('retro.wizard.inventoryEmpty')}</div>
             ) : (
               <div className="retro-inventory-panel">
                 <ul className="retro-inventory">
-                  {cliEntries.map(([cli, ci]) => (
-                    <li key={cli}>
-                      <label className="retro-inv-toggle">
-                        <input
-                          type="checkbox"
-                          checked={!excludedClis[cli]}
-                          onChange={(e) =>
-                            setExcludedClis((m) => ({ ...m, [cli]: !e.target.checked }))
-                          }
-                        />
-                        <span className="retro-inv-cli mono">{cli === 'pidev' ? 'pi' : cli}</span>
-                      </label>
-                      <span className="retro-inv-meta">
-                        {ci.sessions} {t('retro.wizard.sessions')}
-                        <span className="faint"> · {ci.already_known} {t('retro.wizard.known')}</span>
-                      </span>
-                    </li>
-                  ))}
+                  {providers.map((cli) => {
+                    const ci = report?.per_cli?.[cli];
+                    return (
+                      <li key={cli}>
+                        <label className="retro-inv-toggle">
+                          <input
+                            type="checkbox"
+                            checked={!excludedClis[cli]}
+                            onChange={(e) => toggleProvider(cli, e.target.checked)}
+                          />
+                          <span className="retro-inv-cli mono">{cli === 'pidev' ? 'pi' : cli}</span>
+                        </label>
+                        <span className="retro-inv-meta">
+                          {scanning[cli] ? (
+                            <span className="faint pulse">{t('retro.wizard.inventoryLoading')}</span>
+                          ) : ci ? (
+                            <>
+                              {ci.sessions} {t('retro.wizard.sessions')}
+                              <span className="faint"> · {ci.already_known} {t('retro.wizard.known')}</span>
+                            </>
+                          ) : (
+                            <span className="faint">{t('retro.wizard.providerLocked')}</span>
+                          )}
+                        </span>
+                      </li>
+                    );
+                  })}
                 </ul>
-                <span className="retro-field-hint">{t('retro.wizard.includeHint')}</span>
-                {report && (
+                <span className="retro-field-hint">{t('retro.wizard.permissionHint')}</span>
+                {estimate > 0 && (
                   <div className="retro-estimate">
                     <span className="muted">{t('retro.wizard.estimate')}</span>
-                    <strong className="mono">{report.estimated_invocations}</strong>
+                    <strong className="mono">{estimate}</strong>
                   </div>
                 )}
               </div>
             )}
           </div>
+
+          {/* 2º) Período: só aparece após liberar ao menos um provedor. O range é
+              derivado das sessões dos provedores liberados. */}
+          {enabledClis.length > 0 && (
+            <div className="retro-field">
+              <span className="retro-field-label">{t('retro.wizard.window')}</span>
+              <RetroRangePicker
+                report={report}
+                excludedClis={excludedClis}
+                value={range}
+                onChange={setRange}
+              />
+            </div>
+          )}
 
           {/* Profundidade */}
           <div className="retro-field">
@@ -348,7 +382,7 @@ export default function RetroWizard() {
           </details>
 
           <div className="retro-card-foot">
-            <button className="btn btn-accent" onClick={openRun} disabled={cliEntries.length === 0}>
+            <button className="btn btn-accent" onClick={openRun} disabled={enabledClis.length === 0}>
               {t('retro.wizard.openRun')} →
             </button>
           </div>

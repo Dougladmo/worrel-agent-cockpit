@@ -27,6 +27,7 @@ export interface Skill {
   active_generation: number;
   evolution_policy: string;
   origin: string;
+  last_used_at: number;
 }
 
 export interface SkillGeneration {
@@ -282,6 +283,25 @@ export function getSettings(): Promise<Record<string, string>> {
 
 export function putSettings(s: Record<string, string>): Promise<void> {
   return req('/settings', { method: 'PUT', body: JSON.stringify(s) });
+}
+
+export interface PromptDef {
+  name: string;
+  value: string;
+  default: string;
+  overridden: boolean;
+}
+
+export function getPrompts(): Promise<PromptDef[]> {
+  return req('/prompts');
+}
+
+// savePrompt salva o override; value vazio (ou igual ao default) reseta ao default.
+export function savePrompt(name: string, value: string): Promise<unknown> {
+  return req(`/prompts/${encodeURIComponent(name)}`, {
+    method: 'PUT',
+    body: JSON.stringify({ value }),
+  });
 }
 
 // --- Secrets ---
