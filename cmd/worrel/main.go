@@ -38,6 +38,10 @@ import (
 var version = "dev"
 
 func main() {
+	if len(os.Args) > 1 && os.Args[1] == "hook" {
+		runHookCmd(os.Args[2:])
+		return
+	}
 	addr := flag.String("addr", "127.0.0.1:7717", "endereço de escuta")
 	dataDir := flag.String("data", defaultDataDir(), "diretório de dados (~/.worrel)")
 	portFlag := flag.Int("port", 0, "porta (atalho; sobrepõe a porta de --addr)")
