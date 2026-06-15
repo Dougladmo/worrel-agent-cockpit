@@ -10,6 +10,7 @@ import (
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
 
+	"github.com/eduardoworrel/worrel-agent-cockpit/internal/ask"
 	"github.com/eduardoworrel/worrel-agent-cockpit/internal/bus"
 	"github.com/eduardoworrel/worrel-agent-cockpit/internal/store"
 	"github.com/eduardoworrel/worrel-agent-cockpit/internal/vault"
@@ -25,6 +26,7 @@ type Service struct {
 	bus        *bus.Bus
 	vault      *vault.Vault // pode ser nil se o cofre não estiver montado
 	summaryGen SummaryGenerator // opcional; nil = fallback bruto
+	ask        *ask.Broker // pedidos de confirmação/escolha (balões); nil = ask_user indisponível
 }
 
 func New(s *store.Store, b *bus.Bus) *Service { return &Service{store: s, bus: b} }
@@ -44,6 +46,12 @@ func (svc *Service) WithSummaryGenerator(g SummaryGenerator) *Service {
 	return svc
 }
 
+// WithAskBroker liga o broker de balões; habilita a tool ask_user.
+func (svc *Service) WithAskBroker(b *ask.Broker) *Service {
+	svc.ask = b
+	return svc
+}
+
 // ServerFor monta um mcp.Server com handlers atribuídos ao token de sessão
 // (vazio = agente externo, sem vínculo de sessão).
 func (svc *Service) ServerFor(token string) *mcp.Server {
@@ -53,6 +61,7 @@ func (svc *Service) ServerFor(token string) *mcp.Server {
 	svc.addReportTools(srv, a)
 	svc.addSessionTools(srv, a)
 	svc.addSecretTools(srv, a)
+	svc.addAskTools(srv, a)
 	return srv
 }
 
