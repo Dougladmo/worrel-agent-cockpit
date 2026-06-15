@@ -110,7 +110,7 @@ function AppInner() {
         </main>
       </div>
 
-      <SuggestionsDrawer activeProjectId={activeProjectId} reloadKey={reloadKey} />
+      <SuggestionsDrawer activeProjectId={activeProjectId} projects={projects} reloadKey={reloadKey} />
 
       {approval && (
         <SecretApprovalModal requestId={approval.requestId} secretName={approval.secretName} onDone={() => setApproval(null)} />

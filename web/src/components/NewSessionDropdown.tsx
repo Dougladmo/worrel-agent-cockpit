@@ -15,7 +15,8 @@ interface Props {
 // fora / Esc (e zera, pois desmonta).
 export default function NewSessionDropdown({ projectId, anchor, onClose, onStarted }: Props) {
   const ref = useRef<HTMLDivElement>(null);
-  const [phase, setPhase] = useState<'seed' | 'provider'>('seed');
+  // "no project" (projectId null) não tem memória nem skills → vai direto a provider.
+  const [phase, setPhase] = useState<'seed' | 'provider'>(projectId ? 'seed' : 'provider');
   const [skills, setSkills] = useState<Skill[]>([]);
   const [adapters, setAdapters] = useState<DetectedAdapter[]>([]);
   const [skillId, setSkillId] = useState('');

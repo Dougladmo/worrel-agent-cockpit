@@ -1,20 +1,25 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useNavigate } from 'react-router-dom';
 import { listSuggestions, acceptSuggestion, rejectSuggestion } from '../api';
-import type { Suggestion } from '../api';
+import type { Suggestion, Project } from '../api';
 import SuggestionBody from '../components/SuggestionBody';
 
 interface Props {
   // Projeto ativo (terminal/projeto aberto). Vazio = sem escopo de projeto.
   activeProjectId: string | null;
+  // Projetos, para nomear os atalhos de "outros projetos".
+  projects: Project[];
   // Sinal para recarregar (ex.: evento suggestion.created).
   reloadKey: number;
 }
 
-// SuggestionsDrawer fica sempre visível (recolhível). Mostra sugestões globais
-// (sem project_id) fixas + as do projeto ativo, que trocam conforme a navegação.
-export default function SuggestionsDrawer({ activeProjectId, reloadKey }: Props) {
+// SuggestionsDrawer fica sempre visível (recolhível). Mostra as sugestões do
+// projeto ativo; as dos demais projetos viram atalhos navegáveis (não há
+// sugestões "globais" ainda). Aceitar/descartar inline.
+export default function SuggestionsDrawer({ activeProjectId, projects, reloadKey }: Props) {
   const { t } = useTranslation();
+  const navigate = useNavigate();
   const [collapsed, setCollapsed] = useState(false);
   const [all, setAll] = useState<Suggestion[]>([]);
   const [busy, setBusy] = useState(false);
@@ -24,12 +29,17 @@ export default function SuggestionsDrawer({ activeProjectId, reloadKey }: Props)
   }, []);
   useEffect(() => { load(); }, [load, reloadKey]);
 
-  const globals = all.filter((s) => !s.project_id);
+  const nameOf = (pid: string) => projects.find((p) => p.id === pid)?.name ?? pid.slice(0, 8);
   const scoped = activeProjectId ? all.filter((s) => s.project_id === activeProjectId) : [];
-  // O badge reflete só o que está VISÍVEL no escopo atual (globais + projeto
-  // ativo); o resto vira a nota "em outros projetos" para nada sumir em silêncio.
-  const visible = globals.length + scoped.length;
-  const others = all.length - visible;
+  // Demais sugestões agrupadas por projeto → atalhos navegáveis.
+  const otherGroups = Object.entries(
+    all
+      .filter((s) => s.project_id && s.project_id !== activeProjectId)
+      .reduce<Record<string, number>>((acc, s) => {
+        acc[s.project_id] = (acc[s.project_id] ?? 0) + 1;
+        return acc;
+      }, {}),
+  );
 
   async function act(id: string, fn: (id: string) => Promise<unknown>) {
     if (busy) return;
@@ -46,7 +56,7 @@ export default function SuggestionsDrawer({ activeProjectId, reloadKey }: Props)
     return (
       <aside className="drawer drawer-collapsed">
         <button className="drawer-toggle" aria-label={t('drawer.expand')} onClick={() => setCollapsed(false)}>
-          ‹ {visible > 0 && <span className="badge">{visible}</span>}
+          ‹ {all.length > 0 && <span className="badge">{all.length}</span>}
         </button>
       </aside>
     );
@@ -73,20 +83,26 @@ export default function SuggestionsDrawer({ activeProjectId, reloadKey }: Props)
     <aside className="drawer">
       <div className="drawer-head">
         <span>{t('nav.suggestions')}</span>
-        {visible > 0 && <span className="badge">{visible}</span>}
+        {all.length > 0 && <span className="badge">{all.length}</span>}
         <button className="drawer-toggle" aria-label={t('drawer.collapse')} onClick={() => setCollapsed(true)}>›</button>
       </div>
 
       <div className="drawer-body">
-        {activeProjectId && (
+        {scoped.length > 0
+          ? scoped.map(renderItem)
+          : otherGroups.length === 0 && <p className="muted drawer-empty">{t('drawer.none')}</p>}
+
+        {otherGroups.length > 0 && (
           <>
-            <div className="drawer-section-label">{t('drawer.scoped')}</div>
-            {scoped.length === 0 ? <p className="muted drawer-empty">{t('drawer.none')}</p> : scoped.map(renderItem)}
+            <div className="drawer-section-label">{t('drawer.otherProjects')}</div>
+            {otherGroups.map(([pid, n]) => (
+              <button key={pid} className="drawer-shortcut" onClick={() => navigate(`/projects/${pid}`)}>
+                <span>{nameOf(pid)}</span>
+                <span className="badge">{n}</span>
+              </button>
+            ))}
           </>
         )}
-        <div className="drawer-section-label">{t('drawer.global')}</div>
-        {globals.length === 0 ? <p className="muted drawer-empty">{t('drawer.none')}</p> : globals.map(renderItem)}
-        {others > 0 && <p className="muted drawer-empty">{t('drawer.others', { n: others })}</p>}
       </div>
     </aside>
   );

@@ -37,6 +37,7 @@ i18next
             collapse: 'Collapse suggestions',
             expand: 'Expand suggestions',
             others: '{{n}} in other projects',
+            otherProjects: 'Other projects',
           },
           chat: {
             title: 'Distillation Chat',
@@ -471,6 +472,7 @@ i18next
             collapse: 'Recolher sugestões',
             expand: 'Expandir sugestões',
             others: '{{n}} em outros projetos',
+            otherProjects: 'Outros projetos',
           },
           chat: {
             title: 'Chat de Destilação',
