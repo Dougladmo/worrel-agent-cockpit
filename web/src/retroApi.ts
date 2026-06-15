@@ -17,6 +17,7 @@ export interface CLIInventory {
   already_known: number;
   oldest_ms: number;
   newest_ms: number;
+  sessions_ms: number[];
 }
 
 export interface FolderGroup {
@@ -71,6 +72,8 @@ export interface Scope {
   window_days: number;
   adapter?: string;
   model?: string;
+  since?: number;
+  until?: number;
 }
 
 export interface Suggestion {

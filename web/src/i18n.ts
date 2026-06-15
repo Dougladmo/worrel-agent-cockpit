@@ -19,6 +19,24 @@ i18next
             settings: 'Settings',
             newSession: 'New Session',
           },
+          onboarding: {
+            title: 'Worrel starts remembering when you work.',
+            subtitle: 'Start a session and everything learned becomes project memory and skills.',
+            startSession: '＋ Start new session',
+            analyzeHistory: '⌕ Analyze my history',
+            hint: 'Used Claude before? Analysis imports your past history.',
+          },
+          sidebar: {
+            projects: 'Projects',
+            newSessionIn: 'New session in {{name}}',
+          },
+          drawer: {
+            scoped: 'This project',
+            global: 'Global',
+            none: 'No suggestions',
+            collapse: 'Collapse suggestions',
+            expand: 'Expand suggestions',
+          },
           chat: {
             title: 'Distillation Chat',
             subtitle: "Chat with your sessions' memory and distill proposals.",
@@ -128,6 +146,11 @@ i18next
               cancel: 'Cancel',
               unlimited: 'no limit',
               confirmRun: 'Run retroactive analysis?\n\n{{invocations}} estimated invocations · budget {{budget}}/h · depth {{depth}}',
+              rangeOldest: 'oldest',
+              rangeNewest: 'newest',
+              rangeFrom: 'From',
+              rangeTo: 'To',
+              rangeSelected: 'Selected:',
             },
             batch: {
               title: 'Batch review',
@@ -415,6 +438,24 @@ i18next
             settings: 'Configurações',
             newSession: 'Nova Sessão',
           },
+          onboarding: {
+            title: 'O Worrel começa a recordar quando você trabalha.',
+            subtitle: 'Inicie uma sessão e tudo que for aprendido vira memória e skills do projeto.',
+            startSession: '＋ Iniciar nova sessão',
+            analyzeHistory: '⌕ Analisar meu histórico',
+            hint: 'Já usou o Claude antes? A análise importa seu histórico passado.',
+          },
+          sidebar: {
+            projects: 'Projetos',
+            newSessionIn: 'Nova sessão em {{name}}',
+          },
+          drawer: {
+            scoped: 'Deste projeto',
+            global: 'Globais',
+            none: 'Nenhuma sugestão',
+            collapse: 'Recolher sugestões',
+            expand: 'Expandir sugestões',
+          },
           chat: {
             title: 'Chat de Destilação',
             subtitle: 'Converse com a memória das suas sessões e destile propostas.',
@@ -524,6 +565,11 @@ i18next
               cancel: 'Cancelar',
               unlimited: 'sem limite',
               confirmRun: 'Executar análise retroativa?\n\n{{invocations}} invocações estimadas · orçamento {{budget}}/h · profundidade {{depth}}',
+              rangeOldest: 'mais antigo',
+              rangeNewest: 'mais recente',
+              rangeFrom: 'De',
+              rangeTo: 'Até',
+              rangeSelected: 'Selecionado:',
             },
             batch: {
               title: 'Revisão em lote',

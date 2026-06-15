@@ -55,3 +55,28 @@ func TestPlannerImportsScopeAndIdempotent(t *testing.T) {
 		t.Fatalf("pendentes run2 = %d, want 1", len(pend2))
 	}
 }
+
+func TestPlannerHonorsSinceUntil(t *testing.T) {
+	s := newStore(t)
+	old := time.Now().Add(-100 * 24 * time.Hour)
+	mid := time.Now().Add(-30 * 24 * time.Hour)
+	recent := time.Now().Add(-2 * 24 * time.Hour)
+	obs := &fakeObs{id: "claude-code", sess: []adapter.ExternalSession{
+		{Adapter: "claude-code", ExternalRef: "old", Dir: "/x", UpdatedAt: old},
+		{Adapter: "claude-code", ExternalRef: "mid", Dir: "/x", UpdatedAt: mid},
+		{Adapter: "claude-code", ExternalRef: "recent", Dir: "/x", UpdatedAt: recent},
+	}}
+	b := bus.New()
+	imp := distill.NewImporter(s, b)
+	p := NewPlanner(s, imp, []Observer{obs})
+	since := time.Now().Add(-45 * 24 * time.Hour).UnixMilli()
+	until := time.Now().Add(-10 * 24 * time.Hour).UnixMilli()
+	run, err := p.Plan(Scope{CLIs: []string{"claude-code"}, Dirs: []string{"/x"}, Since: since, Until: until})
+	if err != nil {
+		t.Fatal(err)
+	}
+	pend, _ := s.PendingRunSessions(run.ID)
+	if len(pend) != 1 {
+		t.Fatalf("pendentes = %d, want 1 (só 'mid')", len(pend))
+	}
+}

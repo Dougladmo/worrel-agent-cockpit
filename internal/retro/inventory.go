@@ -8,10 +8,11 @@ import (
 )
 
 type CLIInventory struct {
-	Sessions     int   `json:"sessions"`
-	AlreadyKnown int   `json:"already_known"`
-	OldestMs     int64 `json:"oldest_ms"`
-	NewestMs     int64 `json:"newest_ms"`
+	Sessions     int     `json:"sessions"`
+	AlreadyKnown int     `json:"already_known"`
+	OldestMs     int64   `json:"oldest_ms"`
+	NewestMs     int64   `json:"newest_ms"`
+	SessionsMs   []int64 `json:"sessions_ms"`
 }
 
 type FolderGroup struct {
@@ -69,6 +70,7 @@ func (in *Inventory) ScanProgress(since time.Time, emit func(cli string, done, t
 		for _, es := range ext {
 			ci.Sessions++
 			ms := es.UpdatedAt.UnixMilli()
+			ci.SessionsMs = append(ci.SessionsMs, ms)
 			if ci.OldestMs == 0 || ms < ci.OldestMs {
 				ci.OldestMs = ms
 			}

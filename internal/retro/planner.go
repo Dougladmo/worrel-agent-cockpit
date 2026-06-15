@@ -13,6 +13,10 @@ type Scope struct {
 	CLIs       []string `json:"clis"`
 	Dirs       []string `json:"dirs"`
 	WindowDays int      `json:"window_days"`
+	// Since/Until recortam o histórico por timestamp (ms epoch). 0 = sem limite.
+	// Têm precedência sobre WindowDays quando > 0.
+	Since int64 `json:"since"`
+	Until int64 `json:"until"`
 	// Adapter sobrescreve o provider headless para ESTA run (vazio = setting global).
 	Adapter string `json:"adapter"`
 	// Model sobrescreve o modelo do CLI para ESTA run (vazio = default do CLI).
@@ -36,6 +40,9 @@ func NewPlanner(s *store.Store, imp *distill.Importer, obs []Observer) *Planner 
 }
 
 func (p *Planner) since(scope Scope) time.Time {
+	if scope.Since > 0 {
+		return time.UnixMilli(scope.Since)
+	}
 	if scope.WindowDays <= 0 {
 		return time.Time{}
 	}
@@ -88,6 +95,9 @@ func (p *Planner) Plan(scope Scope) (*store.RetroRun, error) {
 		}
 		for _, es := range ext {
 			if len(dirSet) > 0 && !dirSet[es.Dir] {
+				continue
+			}
+			if scope.Until > 0 && es.UpdatedAt.UnixMilli() > scope.Until {
 				continue
 			}
 			sid, err := p.store.SessionIDByExternalRef(es.ExternalRef)
