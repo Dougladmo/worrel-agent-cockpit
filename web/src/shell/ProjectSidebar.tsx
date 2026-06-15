@@ -12,6 +12,9 @@ interface Props {
   projects: Project[];
   wrapperSessions: Session[];
   liveIds: Set<string>;
+  // awaitingIds: sessões cujo CLI terminou o turno e aguarda o usuário (resposta
+  // ou confirmação) → marca a sessão com um alerta visual na sidebar.
+  awaitingIds: Set<string>;
   onStarted: (s: Session) => void;
   onAnalyzeHistory: () => void;
 }
@@ -20,7 +23,7 @@ interface Props {
 // fixado no topo, seguido dos projetos reais. Cada grupo tem o ＋ que abre o
 // NewSessionDropdown multistep. MySpace inicia sessão livre (projectId null).
 // Só sessões VIVAS (com processo ativo) aparecem; encerradas saem da sidebar.
-export default function ProjectSidebar({ projects, wrapperSessions, liveIds, onStarted, onAnalyzeHistory }: Props) {
+export default function ProjectSidebar({ projects, wrapperSessions, liveIds, awaitingIds, onStarted, onAnalyzeHistory }: Props) {
   const { t } = useTranslation();
   const [openFor, setOpenFor] = useState<string | null>(null); // null = nenhum dropdown aberto
   const [anchor, setAnchor] = useState<{ top: number; left: number } | null>(null);
@@ -63,7 +66,12 @@ export default function ProjectSidebar({ projects, wrapperSessions, liveIds, onS
         </div>
         <div className="sidebar-sessions">
           {sessions.map((s) => (
-            <NavLink key={s.id} to={`/sessions/${s.id}`} className="sidebar-session">
+            <NavLink
+              key={s.id}
+              to={`/sessions/${s.id}`}
+              className={`sidebar-session${awaitingIds.has(s.id) ? ' needs-attention' : ''}`}
+              title={awaitingIds.has(s.id) ? t('sidebar.awaiting') : undefined}
+            >
               <span className="sidebar-session-name">{sessionName(s)}</span>
               <ProviderBadge adapter={s.adapter} />
             </NavLink>

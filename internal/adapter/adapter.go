@@ -104,6 +104,17 @@ type ModelLister interface {
 	ListModels(ctx context.Context) ([]string, error)
 }
 
+// InputWaiter é implementado por adaptadores que sabem dizer se o CLI terminou
+// um turno e está aguardando o usuário (uma resposta ou uma confirmação).
+// Opcional: adaptadores sem suporte simplesmente não acionam o alerta na sidebar.
+type InputWaiter interface {
+	// AwaitingInput devolve (true, true) quando o último evento da transcrição é
+	// um turno do assistente já concluído — ou seja, é a vez do usuário (resposta
+	// pendente ou confirmação solicitada). ok=false quando não há sinal confiável
+	// (transcrição ausente/ilegível), e nesse caso o estado anterior é mantido.
+	AwaitingInput(ref SessionRef) (awaiting, ok bool)
+}
+
 // Adapter é a interface implementada por cada CLI suportado.
 type Adapter interface {
 	ID() string

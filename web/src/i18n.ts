@@ -29,6 +29,7 @@ i18next
           sidebar: {
             projects: 'Projects',
             newSessionIn: 'New session in {{name}}',
+            awaiting: 'Waiting for you (response or confirmation)',
           },
           drawer: {
             scoped: 'This project',
@@ -479,6 +480,7 @@ i18next
           sidebar: {
             projects: 'Projetos',
             newSessionIn: 'Nova sessão em {{name}}',
+            awaiting: 'Aguardando você (resposta ou confirmação)',
           },
           drawer: {
             scoped: 'Deste projeto',

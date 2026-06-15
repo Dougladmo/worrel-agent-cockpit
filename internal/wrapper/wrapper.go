@@ -8,6 +8,7 @@ import (
 	"os"
 	"os/exec"
 	"strconv"
+	"strings"
 	"sync"
 	"syscall"
 	"time"
@@ -53,11 +54,13 @@ type Manager struct {
 	mu           sync.Mutex
 	sessions     map[string]*session
 	highNotified map[string]bool // sessões que já receberam session.context_high
+	awaiting     map[string]bool // último estado "aguardando input" por sessão
+	titled       map[string]bool // sessões cujo título já foi derivado (para de pollar)
 }
 
 // New cria um Manager com store e bus fornecidos.
 func New(st *store.Store, b *bus.Bus) *Manager {
-	return &Manager{store: st, bus: b, sessions: map[string]*session{}, highNotified: map[string]bool{}}
+	return &Manager{store: st, bus: b, sessions: map[string]*session{}, highNotified: map[string]bool{}, awaiting: map[string]bool{}, titled: map[string]bool{}}
 }
 
 // Spawn inicia o CmdSpec num PTY e começa o loop de leitura.
@@ -151,6 +154,9 @@ func (m *Manager) onExit(s *session) {
 
 	m.mu.Lock()
 	delete(m.sessions, s.id)
+	delete(m.highNotified, s.id)
+	delete(m.awaiting, s.id)
+	delete(m.titled, s.id)
 	m.mu.Unlock()
 
 	_ = m.store.EndSession(s.id)
@@ -314,6 +320,96 @@ func (m *Manager) trackContext(sessID string, ref adapter.SessionRef, ad adapter
 	}
 }
 
+// maxTitleLen limita o título derivado do primeiro recado do usuário.
+const maxTitleLen = 64
+
+// deriveTitle extrai um rótulo conciso do primeiro recado do usuário: primeira
+// linha não-vazia, sem marcação markdown, truncada. Devolve "" se nada útil.
+func deriveTitle(events []adapter.TranscriptEvent) string {
+	for _, e := range events {
+		if e.Role != "user" {
+			continue
+		}
+		for _, raw := range strings.Split(e.Content, "\n") {
+			line := strings.TrimSpace(raw)
+			line = strings.TrimLeft(line, "#-*> ")
+			line = strings.Map(func(r rune) rune {
+				if r == '`' || r == '*' || r == '_' {
+					return -1
+				}
+				return r
+			}, line)
+			line = strings.TrimSpace(line)
+			if len([]rune(line)) >= 4 {
+				rs := []rune(line)
+				if len(rs) > maxTitleLen {
+					return strings.TrimSpace(string(rs[:maxTitleLen-1])) + "…"
+				}
+				return line
+			}
+		}
+	}
+	return ""
+}
+
+// trackTitle deriva e persiste o título da sessão a partir do primeiro recado
+// do usuário no transcript. Roda a cada poll até conseguir gravar (guarda em
+// titled), então publica session.titled para a UI recarregar a lista.
+func (m *Manager) trackTitle(sessID string, ref adapter.SessionRef, ad adapter.Adapter) {
+	m.mu.Lock()
+	done := m.titled[sessID]
+	m.mu.Unlock()
+	if done {
+		return
+	}
+	events, err := ad.ReadTranscript(ref)
+	if err != nil || len(events) == 0 {
+		return
+	}
+	title := deriveTitle(events)
+	if title == "" {
+		return
+	}
+	wrote, err := m.store.SetSessionTitleIfEmpty(sessID, title)
+	if err != nil {
+		return
+	}
+	m.mu.Lock()
+	m.titled[sessID] = true // título resolvido (gravado agora ou já existente): para de pollar
+	m.mu.Unlock()
+	if wrote {
+		m.bus.Publish(bus.Event{Type: "session.titled",
+			Payload: map[string]any{"session_id": sessID, "title": title}})
+	}
+}
+
+// trackAwaiting consulta se o CLI terminou um turno e aguarda o usuário (resposta
+// ou confirmação), publicando session.awaiting (entra no estado) ou session.busy
+// (sai do estado) APENAS nas transições — evita repetir eventos a cada poll. Só
+// age se o adaptador implementa InputWaiter; sinal indisponível mantém o estado.
+func (m *Manager) trackAwaiting(sessID string, ref adapter.SessionRef, ad adapter.Adapter) {
+	waiter, ok := ad.(adapter.InputWaiter)
+	if !ok {
+		return
+	}
+	awaiting, ok := waiter.AwaitingInput(ref)
+	if !ok {
+		return
+	}
+	m.mu.Lock()
+	prev, seen := m.awaiting[sessID]
+	m.awaiting[sessID] = awaiting
+	m.mu.Unlock()
+	if seen && prev == awaiting {
+		return // sem mudança de estado
+	}
+	typ := "session.busy"
+	if awaiting {
+		typ = "session.awaiting"
+	}
+	m.bus.Publish(bus.Event{Type: typ, Payload: map[string]any{"session_id": sessID}})
+}
+
 // contextPollInterval é o período do tracker de contexto por sessão.
 const contextPollInterval = 10 * time.Second
 
@@ -326,6 +422,8 @@ func (m *Manager) SpawnWithAdapter(sessionID string, spec adapter.CmdSpec, ad ad
 	}
 	go func() {
 		m.trackContext(sessionID, ref, ad) // medição imediata no spawn
+		m.trackTitle(sessionID, ref, ad)
+		m.trackAwaiting(sessionID, ref, ad)
 		ticker := time.NewTicker(contextPollInterval)
 		defer ticker.Stop()
 		for range ticker.C {
@@ -333,6 +431,8 @@ func (m *Manager) SpawnWithAdapter(sessionID string, spec adapter.CmdSpec, ad ad
 				return
 			}
 			m.trackContext(sessionID, ref, ad)
+			m.trackTitle(sessionID, ref, ad)
+			m.trackAwaiting(sessionID, ref, ad)
 		}
 	}()
 	return nil

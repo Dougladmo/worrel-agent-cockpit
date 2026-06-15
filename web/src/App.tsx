@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { BrowserRouter, Routes, Route, useNavigate, useMatch } from 'react-router-dom';
 import { useEvents } from './useEvents';
@@ -48,10 +48,40 @@ function AppInner() {
   const [newSessionProject, setNewSessionProject] = useState<string | null | undefined>(undefined);
   const [reloadKey, setReloadKey] = useState(0);
   const [extract, setExtract] = useState<ExtractState | null>(null);
+  // awaitingIds: sessões cujo CLI terminou o turno e aguarda o usuário.
+  const [awaitingIds, setAwaitingIds] = useState<Set<string>>(new Set());
   const activeProjectId = useActiveProjectId(wrapperSessions);
+  const activeSessionMatch = useMatch('/sessions/:id');
+  const activeSessionId = activeSessionMatch?.params.id ?? null;
+
+  // Abrir a sessão já a "lê": limpa o alerta de atenção localmente (o backend
+  // confirma no próximo poll quando o usuário responde).
+  useEffect(() => {
+    if (!activeSessionId) return;
+    setAwaitingIds((prev) => {
+      if (!prev.has(activeSessionId)) return prev;
+      const next = new Set(prev);
+      next.delete(activeSessionId);
+      return next;
+    });
+  }, [activeSessionId]);
 
   const handleEvent = useCallback((ev: WsEvent) => {
     if (ev.type === 'suggestion.created') setReloadKey((n) => n + 1);
+    // CLI terminou o turno (aguardando resposta/confirmação) ou voltou a
+    // trabalhar: liga/desliga o alerta de atenção da sessão na sidebar.
+    if (ev.type === 'session.awaiting' || ev.type === 'session.busy' || ev.type === 'session.ended') {
+      const p = ev.payload as { session_id?: string; id?: string };
+      const sid = p.session_id ?? p.id;
+      if (sid) {
+        setAwaitingIds((prev) => {
+          const next = new Set(prev);
+          if (ev.type === 'session.awaiting') next.add(sid);
+          else next.delete(sid);
+          return next;
+        });
+      }
+    }
     // Sessão encerrada (kill manual ou processo saiu): recarrega para que
     // liveIds seja recomputado e a sessão saia da sidebar automaticamente, e
     // oferece extrair os aprendizados da sessão (skills/memórias) antes que o
@@ -61,6 +91,8 @@ function AppInner() {
       const p = ev.payload as { id?: string };
       if (p.id) setExtract({ id: p.id, status: 'idle' });
     }
+    // Título da sessão derivado do 1º recado: recarrega para refletir na sidebar.
+    if (ev.type === 'session.titled') reload();
     if (ev.type === 'secret.approval_requested') {
       const p = ev.payload as Record<string, string>;
       setApproval({ requestId: p.request_id, secretName: p.name });
@@ -163,6 +195,7 @@ function AppInner() {
         projects={projects}
         wrapperSessions={wrapperSessions}
         liveIds={liveIds}
+        awaitingIds={awaitingIds}
         onStarted={handleSessionCreated}
         onAnalyzeHistory={() => navigate('/retro')}
       />

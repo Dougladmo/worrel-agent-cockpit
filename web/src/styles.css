@@ -1231,6 +1231,18 @@ tr:last-child td { border-bottom: none; }
   70% { box-shadow: 0 0 0 5px rgba(46, 204, 113, 0); }
   100% { box-shadow: 0 0 0 0 rgba(46, 204, 113, 0); }
 }
+/* Aguardando o usuário (turno do CLI terminou / pediu confirmação): o dot fica
+   vermelho e pulsa mais forte para chamar atenção. */
+.sidebar-session.needs-attention { color: var(--ink, #e6e9ef); }
+.sidebar-session.needs-attention::before {
+  background: #ff4d4d; box-shadow: 0 0 0 0 rgba(255, 77, 77, 0.6);
+  animation: session-attention-pulse 1.2s ease-out infinite;
+}
+@keyframes session-attention-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(255, 77, 77, 0.6); }
+  70% { box-shadow: 0 0 0 6px rgba(255, 77, 77, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(255, 77, 77, 0); }
+}
 .sidebar-session.active { color: var(--ink, #e6e9ef); background: rgba(255,255,255,0.05); }
 /* Barra de seleção reta (sem border-radius), em vez do box-shadow inset herdado. */
 .sidebar a.sidebar-session.active { box-shadow: none; }

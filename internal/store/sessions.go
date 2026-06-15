@@ -219,6 +219,19 @@ func (s *Store) PruneSessionTranscript(sessionID string) error {
 	return tx.Commit()
 }
 
+// SetSessionTitleIfEmpty preenche o título da sessão apenas quando ainda vazio,
+// devolvendo se houve gravação. Idempotente: títulos já definidos (sessões
+// observadas, ou um título derivado anterior) nunca são sobrescritos — o
+// tracker do wrapper chama isto a cada poll e para de tentar quando ok=false.
+func (s *Store) SetSessionTitleIfEmpty(id, title string) (bool, error) {
+	res, err := s.db.Exec(`UPDATE sessions SET title=? WHERE id=? AND COALESCE(title,'')=''`, title, id)
+	if err != nil {
+		return false, err
+	}
+	n, err := res.RowsAffected()
+	return n > 0, err
+}
+
 // SetSessionSummary grava o resumo estruturado de handoff.
 func (s *Store) SetSessionSummary(id, summary string) error {
 	_, err := s.db.Exec(`UPDATE sessions SET summary=? WHERE id=?`, summary, id)

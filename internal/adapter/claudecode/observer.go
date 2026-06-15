@@ -146,6 +146,50 @@ func (a *Adapter) scanSessionMeta(path string) (adapter.ExternalSession, bool) {
 	return es, true
 }
 
+// AwaitingInput implementa adapter.InputWaiter para o Claude Code lendo o JSONL:
+// o último evento user/assistant define de quem é a vez. Se for "assistant", o
+// turno do agente terminou (resposta concluída OU um tool_use aguardando
+// confirmação) e a bola está com o usuário → awaiting. Se for "user" (inclui
+// tool_result), o agente está/ficará trabalhando → não-awaiting. ok=false quando
+// não há transcrição legível, para o tracker preservar o estado anterior.
+func (a *Adapter) AwaitingInput(ref adapter.SessionRef) (awaiting, ok bool) {
+	path := ref.Path
+	if path == "" && ref.ExternalRef != "" {
+		if matches, _ := filepath.Glob(filepath.Join(a.projectsRoot(), "*", ref.ExternalRef+".jsonl")); len(matches) > 0 {
+			path = matches[0]
+		}
+	}
+	if path == "" {
+		return false, false
+	}
+	f, err := os.Open(path)
+	if err != nil {
+		return false, false
+	}
+	defer f.Close()
+	lastRole := ""
+	sc := bufio.NewScanner(f)
+	sc.Buffer(make([]byte, 0, 64*1024), 16*1024*1024)
+	for sc.Scan() {
+		var ev rawEvent
+		if json.Unmarshal(sc.Bytes(), &ev) != nil || ev.Message == nil {
+			continue
+		}
+		switch ev.Type {
+		case "user", "assistant":
+			if ev.Message.Role != "" {
+				lastRole = ev.Message.Role
+			} else {
+				lastRole = ev.Type
+			}
+		}
+	}
+	if lastRole == "" {
+		return false, false
+	}
+	return lastRole == "assistant", true
+}
+
 func (a *Adapter) ReadTranscript(ref adapter.SessionRef) ([]adapter.TranscriptEvent, error) {
 	// Resolve o caminho por external ref quando o Path não vem dado (sessões
 	// in-app: o .jsonl tem o nome do session id == ExternalRef). Espelha a
