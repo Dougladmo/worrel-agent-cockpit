@@ -9,16 +9,23 @@ export interface RangeValue {
   until: number; // ms epoch; 0 = sem limite superior
 }
 
-// toDateInput converte ms epoch para "YYYY-MM-DD" (input type=date).
+// toDateInput converte ms epoch para "YYYY-MM-DD" no fuso LOCAL (input type=date).
+// Usar componentes locais evita o drift de até 1 dia em fusos negativos (ex.: BRT),
+// onde toISOString() (UTC) recuaria o dia exibido.
 function toDateInput(ms: number): string {
   if (!ms) return '';
-  return new Date(ms).toISOString().slice(0, 10);
+  const d = new Date(ms);
+  const mm = String(d.getMonth() + 1).padStart(2, '0');
+  const dd = String(d.getDate()).padStart(2, '0');
+  return `${d.getFullYear()}-${mm}-${dd}`;
 }
 
-// fromDateInput converte "YYYY-MM-DD" para ms epoch no início do dia UTC.
+// fromDateInput converte "YYYY-MM-DD" para ms epoch no início do dia LOCAL,
+// consistente com toDateInput (mesma referência de fuso nos dois sentidos).
 function fromDateInput(v: string): number {
   if (!v) return 0;
-  return new Date(`${v}T00:00:00.000Z`).getTime();
+  const [y, m, d] = v.split('-').map(Number);
+  return new Date(y, m - 1, d).getTime();
 }
 
 interface Props {

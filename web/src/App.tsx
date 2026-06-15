@@ -58,10 +58,25 @@ function AppInner() {
   if (isEmpty) {
     return (
       <>
-        <EmptyState
-          onNewSession={() => setNewSessionProject(null)}
-          onAnalyzeHistory={() => navigate('/retro')}
-        />
+        <Routes>
+          <Route
+            path="/retro"
+            element={
+              <main className="app-layout" style={{ flexDirection: 'column', overflow: 'auto' }}>
+                <Retro />
+              </main>
+            }
+          />
+          <Route
+            path="*"
+            element={
+              <EmptyState
+                onNewSession={() => setNewSessionProject(null)}
+                onAnalyzeHistory={() => navigate('/retro')}
+              />
+            }
+          />
+        </Routes>
         {newSessionProject !== undefined && (
           <NewSessionModal onCreated={handleSessionCreated} onClose={() => setNewSessionProject(undefined)} />
         )}
