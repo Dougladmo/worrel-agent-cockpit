@@ -13,8 +13,10 @@ import RetroRangePicker, { type RangeValue } from './RetroRangePicker';
 
 const PROVIDERS = ['', 'claude-code', 'opencode', 'gemini', 'codex', 'pidev'];
 
-type StageKey = 'inventory' | 'scope' | 'map' | 'execution' | 'review';
-const STAGE_ORDER: StageKey[] = ['inventory', 'scope', 'map', 'execution', 'review'];
+type StageKey = 'scope' | 'map' | 'execution' | 'review';
+// O inventário deixou de ser um passo próprio (foi fundido no Escopo: provedores
+// + período). O fluxo começa em Escopo.
+const STAGE_ORDER: StageKey[] = ['scope', 'map', 'execution', 'review'];
 
 function stageFromStatus(run: RetroRun | null): StageKey {
   if (!run) return 'scope';
