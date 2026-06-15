@@ -10,6 +10,7 @@ const MYSPACE = '__myspace__';
 interface Props {
   projects: Project[];
   wrapperSessions: Session[];
+  liveIds: Set<string>;
   onStarted: (s: Session) => void;
   onAnalyzeHistory: () => void;
 }
@@ -17,11 +18,13 @@ interface Props {
 // ProjectSidebar lista o grupo virtual MySpace (sessões órfãs, sem project_id)
 // fixado no topo, seguido dos projetos reais. Cada grupo tem o ＋ que abre o
 // NewSessionDropdown multistep. MySpace inicia sessão livre (projectId null).
-export default function ProjectSidebar({ projects, wrapperSessions, onStarted, onAnalyzeHistory }: Props) {
+// Só sessões VIVAS (com processo ativo) aparecem; encerradas saem da sidebar.
+export default function ProjectSidebar({ projects, wrapperSessions, liveIds, onStarted, onAnalyzeHistory }: Props) {
   const { t } = useTranslation();
   const [openFor, setOpenFor] = useState<string | null>(null); // null = nenhum dropdown aberto
-  const byProject = (pid: string) => wrapperSessions.filter((s) => s.project_id === pid);
-  const orphans = wrapperSessions.filter((s) => !s.project_id);
+  const live = wrapperSessions.filter((s) => liveIds.has(s.id));
+  const byProject = (pid: string) => live.filter((s) => s.project_id === pid);
+  const orphans = live.filter((s) => !s.project_id);
 
   function handleStarted(s: Session) {
     setOpenFor(null);

@@ -1192,12 +1192,21 @@ tr:last-child td { border-bottom: none; }
 .drawer-card-actions { display: flex; gap: 0.4rem; margin-top: 0.5rem; }
 .drawer-empty { font-size: 0.8rem; padding: 0.2rem; }
 
-/* Retro range picker */
+/* Retro range picker — dual-handle draggable slider */
 .retro-range { display: flex; flex-direction: column; gap: 0.6rem; }
-.retro-range-bounds { display: flex; justify-content: space-between; font-size: 0.75rem; }
-.retro-range-inputs { display: flex; gap: 0.75rem; }
-.retro-range-inputs label { display: flex; flex-direction: column; gap: 0.2rem; font-size: 0.8rem; color: var(--muted); }
 .retro-range-count { font-size: 0.85rem; }
+.retro-range-labels { display: flex; justify-content: space-between; font-size: 0.78rem; color: var(--muted); }
+
+.retro-range-slider { position: relative; height: 28px; }
+.retro-range-rail { position: absolute; top: 12px; left: 0; right: 0; height: 4px; border-radius: 3px; background: var(--border, #232833); }
+.retro-range-fill { position: absolute; top: 12px; height: 4px; border-radius: 3px; background: var(--accent, #5b8cff); }
+/* Os dois inputs ocupam a mesma faixa; só os polegares capturam o ponteiro. */
+.retro-range-thumb { position: absolute; top: 0; left: 0; width: 100%; height: 28px; margin: 0; background: none; pointer-events: none; -webkit-appearance: none; appearance: none; }
+.retro-range-thumb:focus { outline: none; }
+.retro-range-thumb::-webkit-slider-thumb { -webkit-appearance: none; appearance: none; pointer-events: auto; width: 16px; height: 16px; border-radius: 50%; background: #fff; border: 2px solid var(--accent, #5b8cff); cursor: pointer; box-shadow: 0 1px 3px rgba(0,0,0,0.4); }
+.retro-range-thumb::-moz-range-thumb { pointer-events: auto; width: 16px; height: 16px; border-radius: 50%; background: #fff; border: 2px solid var(--accent, #5b8cff); cursor: pointer; }
+.retro-range-thumb::-webkit-slider-runnable-track { background: none; }
+.retro-range-thumb::-moz-range-track { background: none; }
 
 /* New-session multistep dropdown */
 .sidebar-project-head { position: relative; }

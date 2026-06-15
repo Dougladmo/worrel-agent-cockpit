@@ -5,27 +5,13 @@ import type { InventoryReport } from '../retroApi';
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 export interface RangeValue {
-  since: number; // ms epoch; 0 = sem limite inferior
-  until: number; // ms epoch; 0 = sem limite superior
+  since: number; // ms epoch; 0 = colapsa para o mais antigo (sem limite inferior)
+  until: number; // ms epoch; 0 = colapsa para o mais recente (sem limite superior)
 }
 
-// toDateInput converte ms epoch para "YYYY-MM-DD" no fuso LOCAL (input type=date).
-// Usar componentes locais evita o drift de até 1 dia em fusos negativos (ex.: BRT),
-// onde toISOString() (UTC) recuaria o dia exibido.
-function toDateInput(ms: number): string {
-  if (!ms) return '';
-  const d = new Date(ms);
-  const mm = String(d.getMonth() + 1).padStart(2, '0');
-  const dd = String(d.getDate()).padStart(2, '0');
-  return `${d.getFullYear()}-${mm}-${dd}`;
-}
-
-// fromDateInput converte "YYYY-MM-DD" para ms epoch no início do dia LOCAL,
-// consistente com toDateInput (mesma referência de fuso nos dois sentidos).
-function fromDateInput(v: string): number {
-  if (!v) return 0;
-  const [y, m, d] = v.split('-').map(Number);
-  return new Date(y, m - 1, d).getTime();
+// fmt formata um instante para data curta no fuso LOCAL (só leitura).
+function fmt(ms: number): string {
+  return new Date(ms).toLocaleDateString(undefined, { day: '2-digit', month: 'short', year: 'numeric' });
 }
 
 interface Props {
@@ -35,6 +21,9 @@ interface Props {
   onChange: (v: RangeValue) => void;
 }
 
+// RetroRangePicker: slider de intervalo ARRASTÁVEL (dois polegares) sobre o
+// domínio real [mais antigo, mais recente] das sessões dos provedores liberados.
+// Recalcula bounds/contagem quando os provedores são ativados/desativados.
 export default function RetroRangePicker({ report, excludedClis, value, onChange }: Props) {
   const { t } = useTranslation();
 
@@ -52,54 +41,61 @@ export default function RetroRangePicker({ report, excludedClis, value, onChange
     return { bounds: { oldest, newest }, allMs: ms };
   }, [report, excludedClis]);
 
-  const since = value.since || bounds?.oldest || 0;
-  const until = value.until || bounds?.newest || 0;
-
-  const count = useMemo(
-    () => allMs.filter((m) => m >= since && m <= until).length,
-    [allMs, since, until],
-  );
-
   if (!bounds) {
-    return <div className="retro-inventory-panel muted">{t('retro.wizard.inventoryEmpty')}</div>;
+    return <p className="retro-field-hint">{t('retro.wizard.rangeLocked')}</p>;
   }
 
+  const span = Math.max(1, bounds.newest - bounds.oldest);
+  const since = value.since || bounds.oldest;
+  const until = value.until || bounds.newest;
+  const count = allMs.filter((m) => m >= since && m <= until).length;
+  const pct = (ms: number) => ((ms - bounds.oldest) / span) * 100;
+
+  function setSince(ms: number) {
+    const v = Math.min(ms, until);
+    onChange({ since: v <= bounds!.oldest ? 0 : v, until: value.until });
+  }
+  function setUntil(ms: number) {
+    const v = Math.max(ms, since);
+    onChange({ since: value.since, until: v >= bounds!.newest ? 0 : v });
+  }
   function preset(kind: 'all' | 'd30' | 'd7') {
-    if (!bounds) return;
     if (kind === 'all') return onChange({ since: 0, until: 0 });
     const days = kind === 'd30' ? 30 : 7;
-    const lo = Math.max(bounds.oldest, bounds.newest - days * DAY_MS);
-    onChange({ since: lo, until: bounds.newest });
+    const lo = Math.max(bounds!.oldest, bounds!.newest - days * DAY_MS);
+    onChange({ since: lo, until: 0 });
   }
 
   return (
     <div className="retro-range">
-      <div className="retro-range-bounds faint">
-        <span>{toDateInput(bounds.oldest)} · {t('retro.wizard.rangeOldest')}</span>
-        <span>{toDateInput(bounds.newest)} · {t('retro.wizard.rangeNewest')}</span>
+      <div className="retro-range-slider">
+        <div className="retro-range-rail" />
+        <div className="retro-range-fill" style={{ left: `${pct(since)}%`, right: `${100 - pct(until)}%` }} />
+        <input
+          type="range"
+          className="retro-range-thumb"
+          min={bounds.oldest}
+          max={bounds.newest}
+          step={DAY_MS}
+          value={since}
+          aria-label={t('retro.wizard.rangeFrom')}
+          onChange={(e) => setSince(Number(e.target.value))}
+        />
+        <input
+          type="range"
+          className="retro-range-thumb"
+          min={bounds.oldest}
+          max={bounds.newest}
+          step={DAY_MS}
+          value={until}
+          aria-label={t('retro.wizard.rangeTo')}
+          onChange={(e) => setUntil(Number(e.target.value))}
+        />
       </div>
 
-      <div className="retro-range-inputs">
-        <label>
-          {t('retro.wizard.rangeFrom')}
-          <input
-            type="date"
-            min={toDateInput(bounds.oldest)}
-            max={toDateInput(until || bounds.newest)}
-            value={toDateInput(since)}
-            onChange={(e) => onChange({ since: fromDateInput(e.target.value), until: value.until })}
-          />
-        </label>
-        <label>
-          {t('retro.wizard.rangeTo')}
-          <input
-            type="date"
-            min={toDateInput(since || bounds.oldest)}
-            max={toDateInput(bounds.newest)}
-            value={toDateInput(until)}
-            onChange={(e) => onChange({ since: value.since, until: fromDateInput(e.target.value) })}
-          />
-        </label>
+      <div className="retro-range-labels">
+        <span>{fmt(since)}</span>
+        <span>{fmt(until)}</span>
       </div>
 
       <div className="retro-segmented" role="group" aria-label={t('retro.wizard.window')}>

@@ -65,7 +65,10 @@ export default function RetroWizard() {
   const [modelsLoading, setModelsLoading] = useState(false);
   const [modelFreeText, setModelFreeText] = useState(false);
   const [budgetPerHour, setBudgetPerHour] = useState(0);
-  const [excludedClis, setExcludedClis] = useState<Record<string, boolean>>({}); // CLIs desmarcados (fora do histórico)
+  // Permissões por provedor: default TUDO desligado (excluído) — o usuário libera
+  // explicitamente cada CLI cujo histórico o Worrel pode analisar. Só depois o
+  // range aparece, derivado dos provedores liberados.
+  const [excludedClis, setExcludedClis] = useState<Record<string, boolean>>({});
   const [run, setRun] = useState<RetroRun | null>(null);
   const [clusters, setClusters] = useState<RetroCluster[]>([]);
   const [selected, setSelected] = useState<string[]>([]);
@@ -76,7 +79,15 @@ export default function RetroWizard() {
   const refreshInventory = useCallback(async () => {
     setLoadingInventory(true);
     try {
-      setReport(await inventory(0)); // varre tudo; o recorte é feito no cliente via range
+      const rep = await inventory(0); // varre tudo; o recorte é feito no cliente via range
+      setReport(rep);
+      // Inicializa as permissões como TODAS desligadas (excluídas) na 1ª carga.
+      setExcludedClis((prev) => {
+        if (Object.keys(prev).length > 0) return prev;
+        const off: Record<string, boolean> = {};
+        Object.keys(rep.per_cli).forEach((c) => { off[c] = true; });
+        return off;
+      });
     } catch (e) {
       setErr(String(e));
     } finally {
@@ -181,6 +192,7 @@ export default function RetroWizard() {
   const stage = stageFromStatus(run);
 
   const cliEntries = Object.entries(report?.per_cli ?? {});
+  const enabledClis = cliEntries.filter(([c]) => !excludedClis[c]);
 
   return (
     <div className="retro-wizard">
@@ -196,20 +208,9 @@ export default function RetroWizard() {
             <p className="muted">{t('retro.wizard.scopeSubtitle')}</p>
           </header>
 
-          {/* Período: recorte data-driven derivado do inventário */}
+          {/* 1º) Provedores — permissões: libere o histórico a analisar (default OFF) */}
           <div className="retro-field">
-            <span className="retro-field-label">{t('retro.wizard.window')}</span>
-            <RetroRangePicker
-              report={report}
-              excludedClis={excludedClis}
-              value={range}
-              onChange={setRange}
-            />
-          </div>
-
-          {/* Inventário + seleção de quais CLIs entram no histórico */}
-          <div className="retro-field">
-            <span className="retro-field-label">{t('retro.wizard.inventoryTitle')}</span>
+            <span className="retro-field-label">{t('retro.wizard.providersTitle')}</span>
             {loadingInventory ? (
               <div className="retro-inventory-panel muted">
                 <span className="pulse">{t('retro.wizard.inventoryLoading')}</span>
@@ -238,8 +239,8 @@ export default function RetroWizard() {
                     </li>
                   ))}
                 </ul>
-                <span className="retro-field-hint">{t('retro.wizard.includeHint')}</span>
-                {report && (
+                <span className="retro-field-hint">{t('retro.wizard.permissionHint')}</span>
+                {report && enabledClis.length > 0 && (
                   <div className="retro-estimate">
                     <span className="muted">{t('retro.wizard.estimate')}</span>
                     <strong className="mono">{report.estimated_invocations}</strong>
@@ -248,6 +249,20 @@ export default function RetroWizard() {
               </div>
             )}
           </div>
+
+          {/* 2º) Período: só aparece após liberar ao menos um provedor. O range é
+              derivado das sessões dos provedores liberados. */}
+          {enabledClis.length > 0 && (
+            <div className="retro-field">
+              <span className="retro-field-label">{t('retro.wizard.window')}</span>
+              <RetroRangePicker
+                report={report}
+                excludedClis={excludedClis}
+                value={range}
+                onChange={setRange}
+              />
+            </div>
+          )}
 
           {/* Profundidade */}
           <div className="retro-field">
@@ -343,7 +358,7 @@ export default function RetroWizard() {
           </details>
 
           <div className="retro-card-foot">
-            <button className="btn btn-accent" onClick={openRun} disabled={cliEntries.length === 0}>
+            <button className="btn btn-accent" onClick={openRun} disabled={enabledClis.length === 0}>
               {t('retro.wizard.openRun')} →
             </button>
           </div>

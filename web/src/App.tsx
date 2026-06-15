@@ -32,7 +32,7 @@ function useActiveProjectId(wrapperSessions: Session[]): string | null {
 
 function AppInner() {
   const navigate = useNavigate();
-  const { loading, projects, wrapperSessions, isEmpty, reload } = useAppState();
+  const { loading, projects, wrapperSessions, liveIds, isEmpty, reload } = useAppState();
   const [approval, setApproval] = useState<ApprovalRequest | null>(null);
   const [newSessionProject, setNewSessionProject] = useState<string | null | undefined>(undefined);
   const [reloadKey, setReloadKey] = useState(0);
@@ -92,6 +92,7 @@ function AppInner() {
       <ProjectSidebar
         projects={projects}
         wrapperSessions={wrapperSessions}
+        liveIds={liveIds}
         onStarted={handleSessionCreated}
         onAnalyzeHistory={() => navigate('/retro')}
       />

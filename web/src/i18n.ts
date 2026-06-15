@@ -36,6 +36,7 @@ i18next
             none: 'No suggestions',
             collapse: 'Collapse suggestions',
             expand: 'Expand suggestions',
+            others: '{{n}} in other projects',
           },
           chat: {
             title: 'Distillation Chat',
@@ -151,6 +152,9 @@ i18next
               rangeFrom: 'From',
               rangeTo: 'To',
               rangeSelected: 'Selected:',
+              providersTitle: 'Providers — grant history access',
+              permissionHint: 'Enable the providers whose history Worrel may analyze. The date range is built from the granted ones.',
+              rangeLocked: 'Grant at least one provider to choose the period.',
             },
             batch: {
               title: 'Batch review',
@@ -466,6 +470,7 @@ i18next
             none: 'Nenhuma sugestão',
             collapse: 'Recolher sugestões',
             expand: 'Expandir sugestões',
+            others: '{{n}} em outros projetos',
           },
           chat: {
             title: 'Chat de Destilação',
@@ -581,6 +586,9 @@ i18next
               rangeFrom: 'De',
               rangeTo: 'Até',
               rangeSelected: 'Selecionado:',
+              providersTitle: 'Provedores — libere o histórico',
+              permissionHint: 'Ative os provedores cujo histórico o Worrel pode analisar. O período é montado a partir dos liberados.',
+              rangeLocked: 'Libere ao menos um provedor para escolher o período.',
             },
             batch: {
               title: 'Revisão em lote',

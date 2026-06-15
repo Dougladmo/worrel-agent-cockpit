@@ -26,6 +26,10 @@ export default function SuggestionsDrawer({ activeProjectId, reloadKey }: Props)
 
   const globals = all.filter((s) => !s.project_id);
   const scoped = activeProjectId ? all.filter((s) => s.project_id === activeProjectId) : [];
+  // O badge reflete só o que está VISÍVEL no escopo atual (globais + projeto
+  // ativo); o resto vira a nota "em outros projetos" para nada sumir em silêncio.
+  const visible = globals.length + scoped.length;
+  const others = all.length - visible;
 
   async function act(id: string, fn: (id: string) => Promise<unknown>) {
     if (busy) return;
@@ -42,7 +46,7 @@ export default function SuggestionsDrawer({ activeProjectId, reloadKey }: Props)
     return (
       <aside className="drawer drawer-collapsed">
         <button className="drawer-toggle" aria-label={t('drawer.expand')} onClick={() => setCollapsed(false)}>
-          ‹ {all.length > 0 && <span className="badge">{all.length}</span>}
+          ‹ {visible > 0 && <span className="badge">{visible}</span>}
         </button>
       </aside>
     );
@@ -69,7 +73,7 @@ export default function SuggestionsDrawer({ activeProjectId, reloadKey }: Props)
     <aside className="drawer">
       <div className="drawer-head">
         <span>{t('nav.suggestions')}</span>
-        {all.length > 0 && <span className="badge">{all.length}</span>}
+        {visible > 0 && <span className="badge">{visible}</span>}
         <button className="drawer-toggle" aria-label={t('drawer.collapse')} onClick={() => setCollapsed(true)}>›</button>
       </div>
 
@@ -82,6 +86,7 @@ export default function SuggestionsDrawer({ activeProjectId, reloadKey }: Props)
         )}
         <div className="drawer-section-label">{t('drawer.global')}</div>
         {globals.length === 0 ? <p className="muted drawer-empty">{t('drawer.none')}</p> : globals.map(renderItem)}
+        {others > 0 && <p className="muted drawer-empty">{t('drawer.others', { n: others })}</p>}
       </div>
     </aside>
   );
