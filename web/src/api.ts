@@ -16,6 +16,16 @@ export interface MemoryVersion {
   created_at: number;
 }
 
+export interface AskRequest {
+  request_id: string;
+  session_id: string;
+  session_label: string;
+  kind: 'permission' | 'choice';
+  title: string;
+  detail?: string;
+  options: string[] | null;
+}
+
 export interface Skill {
   id: string;
   project_id: string;
@@ -304,6 +314,17 @@ export async function pasteImage(id: string, blob: Blob): Promise<{ path: string
 
 export function postHandoff(id: string): Promise<{ old_id: string; new_id: string; summary: string }> {
   return req(`/sessions/${id}/handoff`, { method: 'POST' });
+}
+
+export function getPendingAsks(): Promise<AskRequest[]> {
+  return req('/asks/pending');
+}
+
+export function respondAsk(requestId: string, answer: string): Promise<void> {
+  return req(`/asks/${requestId}/respond`, {
+    method: 'POST',
+    body: JSON.stringify({ answer }),
+  });
 }
 
 export function getSettings(): Promise<Record<string, string>> {
