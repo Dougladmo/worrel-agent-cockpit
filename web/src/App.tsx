@@ -3,8 +3,9 @@ import { useTranslation } from 'react-i18next';
 import { BrowserRouter, Routes, Route, useNavigate, useMatch } from 'react-router-dom';
 import { useEvents } from './useEvents';
 import type { WsEvent } from './useEvents';
-import { distillSession } from './api';
-import type { DistillResult } from './api';
+import { distillSession, getPendingAsks } from './api';
+import type { DistillResult, AskRequest } from './api';
+import AskBalloons from './components/AskBalloons';
 import Project from './pages/Project';
 import Settings from './pages/Settings';
 import Terminal from './pages/Terminal';
@@ -48,6 +49,7 @@ function AppInner() {
   const [newSessionProject, setNewSessionProject] = useState<string | null | undefined>(undefined);
   const [reloadKey, setReloadKey] = useState(0);
   const [extract, setExtract] = useState<ExtractState | null>(null);
+  const [asks, setAsks] = useState<AskRequest[]>([]);
   // awaitingIds: sessões cujo CLI terminou o turno e aguarda o usuário.
   const [awaitingIds, setAwaitingIds] = useState<Set<string>>(new Set());
   const activeProjectId = useActiveProjectId(wrapperSessions);
@@ -65,6 +67,10 @@ function AppInner() {
       return next;
     });
   }, [activeSessionId]);
+
+  const loadAsks = useCallback(() => {
+    getPendingAsks().then(setAsks).catch(() => { /* ignore */ });
+  }, []);
 
   const handleEvent = useCallback((ev: WsEvent) => {
     if (ev.type === 'suggestion.created') setReloadKey((n) => n + 1);
@@ -97,8 +103,21 @@ function AppInner() {
       const p = ev.payload as Record<string, string>;
       setApproval({ requestId: p.request_id, secretName: p.name });
     }
-  }, [reload]);
-  useEvents(handleEvent);
+    if (ev.type === 'ask.requested') {
+      const p = ev.payload as AskRequest;
+      setAsks((prev) => (prev.some((a) => a.request_id === p.request_id) ? prev : [...prev, p]));
+    }
+    if (ev.type === 'ask.resolved') {
+      const p = ev.payload as { request_id: string };
+      setAsks((prev) => prev.filter((a) => a.request_id !== p.request_id));
+    }
+    if (ev.type === 'session.ended') {
+      const p = ev.payload as { id?: string };
+      if (p.id) setAsks((prev) => prev.filter((a) => a.session_id !== p.id));
+    }
+  }, [reload, loadAsks]);
+  useEvents(handleEvent, loadAsks);
+  useEffect(() => { loadAsks(); }, [loadAsks]);
 
   async function handleExtract() {
     if (!extract) return;
@@ -184,6 +203,7 @@ function AppInner() {
         {approval && (
           <SecretApprovalModal requestId={approval.requestId} secretName={approval.secretName} onDone={() => setApproval(null)} />
         )}
+        <AskBalloons asks={asks} onResolved={(id) => setAsks((prev) => prev.filter((a) => a.request_id !== id))} />
         {extractToast}
       </>
     );
@@ -217,6 +237,7 @@ function AppInner() {
       {approval && (
         <SecretApprovalModal requestId={approval.requestId} secretName={approval.secretName} onDone={() => setApproval(null)} />
       )}
+      <AskBalloons asks={asks} onResolved={(id) => setAsks((prev) => prev.filter((a) => a.request_id !== id))} />
       {extractToast}
     </div>
   );

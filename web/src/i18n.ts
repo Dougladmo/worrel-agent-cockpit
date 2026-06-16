@@ -362,6 +362,13 @@ i18next
             connectionError: 'connection error',
             pasteImageError: 'failed to paste image',
           },
+          ask: {
+            allow: 'Allow',
+            deny: 'Deny',
+            send: 'Send',
+            placeholder: 'Type your answer…',
+            openSession: 'Open this session',
+          },
           sessionExtract: {
             prompt: 'Session ended. Extract learnings from it?',
             extract: 'Extract learnings',
@@ -812,6 +819,13 @@ i18next
             connectionClosed: 'conexão encerrada',
             connectionError: 'erro de conexão',
             pasteImageError: 'falha ao colar imagem',
+          },
+          ask: {
+            allow: 'Permitir',
+            deny: 'Negar',
+            send: 'Enviar',
+            placeholder: 'Digite sua resposta…',
+            openSession: 'Abrir esta sessão',
           },
           sessionExtract: {
             prompt: 'Sessão encerrada. Extrair os aprendizados dela?',
