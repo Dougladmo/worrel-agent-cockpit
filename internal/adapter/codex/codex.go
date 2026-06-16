@@ -15,6 +15,7 @@ package codex
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -52,10 +53,12 @@ func New() *Adapter {
 func (a *Adapter) ID() string { return "codex" }
 
 func (a *Adapter) Capabilities() adapter.Caps {
-	// Codex TUI: sem hooks de worrel; headless via `exec`; ele gera o próprio
-	// session id (rollout uuid), worrel não o injeta → OwnSessionID=false;
+	// Codex (v0.13x+): PreToolUse usa o MESMO schema do Claude Code
+	// (stdin tool_name/tool_input; stdout permissionDecision allow/deny/ask),
+	// então o hook de permissão do worrel funciona → Hooks=true. Headless via
+	// `exec`; ele gera o próprio session id (rollout uuid) → OwnSessionID=false;
 	// contexto medido via rollouts (token_count + model_context_window).
-	return adapter.Caps{Hooks: false, Headless: true, OwnSessionID: false, ContextMeasured: true}
+	return adapter.Caps{Hooks: true, Headless: true, OwnSessionID: false, ContextMeasured: true}
 }
 
 var versionRe = regexp.MustCompile(`\d+\.\d+\.\d+`)
@@ -83,6 +86,27 @@ func mcpConfigOverrides(url string) []string {
 	}
 }
 
+// hookToolMatcher escopa o PreToolUse às tools que mutam/executam. É regex
+// case-insensitive (Rust regex) sobre tool_name; nomes que não existem na versão
+// do Codex simplesmente nunca casam (degradação segura). Cobre as variações de
+// nome do shell/exec e do apply_patch entre versões.
+const hookToolMatcher = `(?i)(bash|shell|exec|apply_patch|patch|write|edit|fetch)`
+
+// hookConfigOverrides devolve os args que registram o hook PreToolUse do worrel
+// via `-c` (valor parseado como TOML pelo Codex), sem tocar no config global, e
+// o flag que dispensa o trust-gate por hash (necessário p/ automação: o hook é
+// gerado pelo próprio worrel). cmd lê o tool_input no stdin e responde
+// permissionDecision allow/deny/ask no stdout (mesmo contrato do Claude Code).
+func hookConfigOverrides(selfExe, sessionID string, port int) []string {
+	cmd := fmt.Sprintf("%s hook prompt --session %s --port %d --format codex", selfExe, sessionID, port)
+	value := "[{matcher=" + strconv.Quote(hookToolMatcher) +
+		",hooks=[{type=\"command\",command=" + strconv.Quote(cmd) + ",timeout=31536000}]}]"
+	return []string{
+		"-c", "hooks.PreToolUse=" + value,
+		"--dangerously-bypass-hook-trust",
+	}
+}
+
 func (a *Adapter) BuildInteractive(opts adapter.SpawnOpts) (adapter.CmdSpec, error) {
 	args := []string{}
 	if opts.WorkingDir != "" {
@@ -90,6 +114,9 @@ func (a *Adapter) BuildInteractive(opts adapter.SpawnOpts) (adapter.CmdSpec, err
 	}
 	if opts.MCPURL != "" {
 		args = append(args, mcpConfigOverrides(opts.MCPURL)...)
+	}
+	if opts.SelfExe != "" && opts.Port != 0 {
+		args = append(args, hookConfigOverrides(opts.SelfExe, opts.SessionID, opts.Port)...)
 	}
 	// O primer vai como PROMPT posicional → visível na sessão (aceitação §13.1).
 	// "--" separa o prompt dos flags variádicos (-c key=value ...), evitando que

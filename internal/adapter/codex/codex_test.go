@@ -15,8 +15,8 @@ func TestID(t *testing.T) {
 
 func TestCapabilities(t *testing.T) {
 	c := New().Capabilities()
-	if c.Hooks {
-		t.Error("Hooks deveria ser false")
+	if !c.Hooks {
+		t.Error("Hooks deveria ser true (PreToolUse v0.13x+)")
 	}
 	if !c.Headless {
 		t.Error("Headless deveria ser true")
@@ -73,6 +73,39 @@ func TestBuildInteractive(t *testing.T) {
 	last := spec.Args[len(spec.Args)-2:]
 	if last[0] != "--" || last[1] != "olá agente" {
 		t.Errorf("primer mal posicionado: %v", spec.Args)
+	}
+}
+
+func TestBuildInteractiveInjectsHook(t *testing.T) {
+	spec, err := New().BuildInteractive(adapter.SpawnOpts{
+		SessionID: "sess-9",
+		SelfExe:   "/usr/local/bin/worrel",
+		Port:      9000,
+		MCPURL:    "http://127.0.0.1:9000/mcp?s=tok",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	args := strings.Join(spec.Args, " ")
+	if !strings.Contains(args, "hooks.PreToolUse=") {
+		t.Errorf("faltou override do hook: %v", spec.Args)
+	}
+	if !strings.Contains(args, "--dangerously-bypass-hook-trust") {
+		t.Errorf("faltou bypass do trust-gate: %v", spec.Args)
+	}
+	if !strings.Contains(args, "hook prompt --session sess-9 --port 9000 --format codex") {
+		t.Errorf("comando do hook mal montado: %v", spec.Args)
+	}
+}
+
+// Sem SelfExe/Port não injeta hook (degradação).
+func TestBuildInteractiveNoHookWithoutSelfExe(t *testing.T) {
+	spec, err := New().BuildInteractive(adapter.SpawnOpts{MCPURL: "http://x/mcp"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if strings.Contains(strings.Join(spec.Args, " "), "hooks.PreToolUse") {
+		t.Errorf("não deveria injetar hook sem SelfExe/Port: %v", spec.Args)
 	}
 }
 

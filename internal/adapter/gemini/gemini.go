@@ -21,6 +21,7 @@ package gemini
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -57,10 +58,12 @@ func New() *Adapter {
 func (a *Adapter) ID() string { return "gemini" }
 
 func (a *Adapter) Capabilities() adapter.Caps {
-	// Gemini CLI: sem hooks de auto-relato como o Claude Code; headless real via
+	// Gemini CLI (v0.26.0+): hook BeforeTool roda um comando externo que recebe a
+	// tool call no stdin e responde {"decision":"allow"|"deny"} no stdout → o hook
+	// de permissão do worrel funciona → Hooks=true. Headless real via
 	// `-p --output-format json`; NÃO aceita --session-id próprio (o id é interno);
 	// contexto medível a partir de chats/checkpoints/logs no disco.
-	return adapter.Caps{Hooks: false, Headless: true, OwnSessionID: false, ContextMeasured: true}
+	return adapter.Caps{Hooks: true, Headless: true, OwnSessionID: false, ContextMeasured: true}
 }
 
 var versionRe = regexp.MustCompile(`\d+\.\d+\.\d+`)
@@ -77,10 +80,19 @@ func (a *Adapter) Detect() (adapter.Installed, error) {
 	return adapter.Installed{Present: true, Path: path, Version: ver}, nil
 }
 
-// writeMCPSettings grava {"mcpServers":{"worrel":{"httpUrl":...}}} num arquivo
-// dentro de configDir e devolve o caminho. É consumido via
-// GEMINI_CLI_SYSTEM_SETTINGS_PATH (system settings, mescladas pelo CLI).
-func writeMCPSettings(configDir, url string) (string, error) {
+// hookToolMatcher escopa o BeforeTool às tools que mutam/executam (regex sobre o
+// nome da tool built-in do Gemini). Tools de leitura/busca não casam → sem balão.
+const hookToolMatcher = `run_shell_command|write_file|replace|web_fetch`
+
+// hookTimeoutMs é o timeout do comando do hook em MILISSEGUNDOS (Gemini usa ms).
+// ~365 dias: o hook bloqueia até o usuário responder o balão.
+const hookTimeoutMs = 31536000000
+
+// writeSettings grava o settings.json do worrel (mcpServers + hooks opcional) num
+// arquivo dentro de configDir e devolve o caminho. É consumido via
+// GEMINI_CLI_SYSTEM_SETTINGS_PATH (system settings, mescladas pelo CLI). Quando
+// hookCmd != "", adiciona um hook BeforeTool que delega a permissão ao worrel.
+func writeSettings(configDir, url, hookCmd string) (string, error) {
 	if configDir == "" {
 		configDir = os.TempDir()
 	}
@@ -88,6 +100,18 @@ func writeMCPSettings(configDir, url string) (string, error) {
 		"mcpServers": map[string]any{
 			"worrel": map[string]any{"httpUrl": url},
 		},
+	}
+	if hookCmd != "" {
+		cfg["hooks"] = map[string]any{
+			"BeforeTool": []any{
+				map[string]any{
+					"matcher": hookToolMatcher,
+					"hooks": []any{
+						map[string]any{"type": "command", "command": hookCmd, "timeout": hookTimeoutMs},
+					},
+				},
+			},
+		}
 	}
 	b, err := json.Marshal(cfg)
 	if err != nil {
@@ -100,11 +124,20 @@ func writeMCPSettings(configDir, url string) (string, error) {
 	return path, nil
 }
 
+// hookCommand monta o comando do hook BeforeTool, ou "" se faltarem dados (sem
+// binário/porta → sem hook). O worrel responde {"decision":...} via --format gemini.
+func hookCommand(selfExe, sessionID string, port int) string {
+	if selfExe == "" || port == 0 {
+		return ""
+	}
+	return fmt.Sprintf("%s hook prompt --session %s --port %d --format gemini", selfExe, sessionID, port)
+}
+
 func (a *Adapter) BuildInteractive(opts adapter.SpawnOpts) (adapter.CmdSpec, error) {
 	args := buildInteractiveArgs(opts)
 	spec := adapter.CmdSpec{Path: "gemini", Args: args, Dir: opts.WorkingDir}
 	if opts.MCPURL != "" {
-		path, err := writeMCPSettings(opts.ConfigDir, opts.MCPURL)
+		path, err := writeSettings(opts.ConfigDir, opts.MCPURL, hookCommand(opts.SelfExe, opts.SessionID, opts.Port))
 		if err != nil {
 			return adapter.CmdSpec{}, err
 		}
@@ -141,7 +174,8 @@ func (a *Adapter) RunHeadless(ctx context.Context, prompt string, opts adapter.H
 	cmd := exec.CommandContext(ctx, "gemini", args...)
 	cmd.Dir = opts.WorkingDir
 	if opts.MCPURL != "" {
-		path, err := writeMCPSettings(os.TempDir(), opts.MCPURL)
+		// headless (varredura/handoff) não tem balão → sem hook.
+		path, err := writeSettings(os.TempDir(), opts.MCPURL, "")
 		if err == nil {
 			cmd.Env = append(os.Environ(), "GEMINI_CLI_SYSTEM_SETTINGS_PATH="+path)
 			defer os.Remove(path)

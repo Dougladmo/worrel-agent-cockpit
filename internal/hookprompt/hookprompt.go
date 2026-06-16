@@ -1,6 +1,14 @@
 // Package hookprompt implementa o subcomando "worrel hook prompt": lê o JSON do
-// PreToolUse no stdin, pede a decisão ao worrel (que bloqueia até o balão), e
-// imprime a decisão de permissão no formato esperado pelo Claude Code.
+// hook pré-execução no stdin, pede a decisão ao worrel (que bloqueia até o balão),
+// e imprime a decisão de permissão no formato esperado pelo CLI alvo.
+//
+// Formatos suportados (--format):
+//   - "claude" / "codex": idênticos —
+//     {"hookSpecificOutput":{"hookEventName":"PreToolUse","permissionDecision":"allow|deny|ask"}}.
+//     Codex (PreToolUse) reusa o mesmo schema do Claude Code, incluindo o enum
+//     allow/deny/ask, então compartilham a renderização.
+//   - "gemini": {"decision":"allow"} | {"decision":"deny","reason":...}; para
+//     deferir ao fluxo nativo, emite {} (sem decisão).
 package hookprompt
 
 import (
@@ -11,36 +19,51 @@ import (
 	"time"
 )
 
-// input é o subconjunto do JSON do hook PreToolUse que usamos.
+// input é o subconjunto do JSON do hook que usamos. Claude Code, Codex e Gemini
+// entregam o nome e os args da tool em tool_name/tool_input.
 type input struct {
 	ToolName  string          `json:"tool_name"`
 	ToolInput json.RawMessage `json:"tool_input"`
 }
 
-type hookSpecificOutput struct {
-	HookEventName      string `json:"hookEventName"`
-	PermissionDecision string `json:"permissionDecision"`
+// render produz o JSON de saída no formato do CLI alvo. decision ∈
+// {"allow","deny",""}; "" significa deferir ao fluxo nativo de permissão.
+func render(format, decision string) any {
+	switch format {
+	case "gemini":
+		switch decision {
+		case "allow":
+			return map[string]any{"decision": "allow"}
+		case "deny":
+			return map[string]any{"decision": "deny", "reason": "Negado pelo worrel"}
+		default:
+			// sem decisão → Gemini segue o fluxo normal de confirmação
+			return map[string]any{}
+		}
+	default: // "claude", "codex" e qualquer outro: schema do Claude Code
+		pd := decision
+		if pd == "" {
+			pd = "ask" // defer: deixa o CLI seguir o fluxo normal de permissão
+		}
+		return map[string]any{
+			"hookSpecificOutput": map[string]any{
+				"hookEventName":      "PreToolUse",
+				"permissionDecision": pd,
+			},
+		}
+	}
 }
 
-type output struct {
-	HookSpecificOutput hookSpecificOutput `json:"hookSpecificOutput"`
-}
+// Run executa o fluxo do hook. baseURL é "http://127.0.0.1:<port>"; format
+// seleciona o schema de saída. Em qualquer falha (stdin ilegível, worrel
+// inacessível) cai no fallback seguro de DEFERIR, deixando o CLI seguir o
+// fluxo normal de permissão em vez de negar silenciosamente.
+func Run(stdin io.Reader, stdout io.Writer, baseURL, sessionID, format string) error {
+	enc := json.NewEncoder(stdout)
 
-func decision(pd string) output {
-	return output{HookSpecificOutput: hookSpecificOutput{HookEventName: "PreToolUse", PermissionDecision: pd}}
-}
-
-func writeOut(w io.Writer, o output) error {
-	return json.NewEncoder(w).Encode(o)
-}
-
-// Run executa o fluxo do hook. baseURL é "http://127.0.0.1:<port>".
-// Em qualquer falha (stdin ilegível, worrel inacessível) cai no fallback seguro
-// "ask", deixando o Claude Code seguir o fluxo normal de permissão.
-func Run(stdin io.Reader, stdout io.Writer, baseURL, sessionID string) error {
 	var in input
 	if err := json.NewDecoder(stdin).Decode(&in); err != nil {
-		return writeOut(stdout, decision("ask"))
+		return enc.Encode(render(format, ""))
 	}
 	body, _ := json.Marshal(map[string]any{"tool": in.ToolName, "input": in.ToolInput})
 
@@ -48,7 +71,7 @@ func Run(stdin io.Reader, stdout io.Writer, baseURL, sessionID string) error {
 	resp, err := client.Post(baseURL+"/api/sessions/"+sessionID+"/permission-request",
 		"application/json", bytes.NewReader(body))
 	if err != nil {
-		return writeOut(stdout, decision("ask"))
+		return enc.Encode(render(format, ""))
 	}
 	defer resp.Body.Close()
 
@@ -56,14 +79,13 @@ func Run(stdin io.Reader, stdout io.Writer, baseURL, sessionID string) error {
 		Decision string `json:"decision"`
 	}
 	if err := json.NewDecoder(resp.Body).Decode(&dec); err != nil {
-		return writeOut(stdout, decision("ask"))
+		return enc.Encode(render(format, ""))
 	}
 	// Só "allow"/"deny" explícitos são honrados; qualquer outra coisa (corpo
-	// inesperado, decisão vazia) cai no fallback seguro "ask" — deixa o Claude
-	// Code seguir o fluxo normal de permissão em vez de negar silenciosamente.
-	pd := "ask"
+	// inesperado, decisão vazia) defere ao fluxo nativo.
+	d := ""
 	if dec.Decision == "allow" || dec.Decision == "deny" {
-		pd = dec.Decision
+		d = dec.Decision
 	}
-	return writeOut(stdout, decision(pd))
+	return enc.Encode(render(format, d))
 }

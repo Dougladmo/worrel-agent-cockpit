@@ -15,8 +15,8 @@ func TestIDAndCaps(t *testing.T) {
 		t.Fatalf("ID = %q, want gemini", a.ID())
 	}
 	c := a.Capabilities()
-	if c.Hooks {
-		t.Errorf("Hooks should be false")
+	if !c.Hooks {
+		t.Errorf("Hooks should be true (BeforeTool v0.26.0+)")
 	}
 	if !c.Headless {
 		t.Errorf("Headless should be true")
@@ -117,6 +117,53 @@ func TestBuildInteractiveMCP(t *testing.T) {
 		if _, err := os.Stat(settingsPath); !os.IsNotExist(err) {
 			t.Errorf("cleanup did not remove settings file")
 		}
+	}
+}
+
+func TestBuildInteractiveInjectsHook(t *testing.T) {
+	dir := t.TempDir()
+	spec, err := New().BuildInteractive(adapter.SpawnOpts{
+		SessionID: "sess-7",
+		SelfExe:   "/usr/local/bin/worrel",
+		Port:      9000,
+		MCPURL:    "http://127.0.0.1:9000/mcp?s=tok",
+		ConfigDir: dir,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := os.ReadFile(filepath.Join(dir, "gemini-settings.json"))
+	if err != nil {
+		t.Fatalf("settings file missing: %v", err)
+	}
+	s := string(b)
+	if !containsSub(s, "BeforeTool") || !containsSub(s, "run_shell_command") {
+		t.Errorf("settings missing hook block: %s", s)
+	}
+	if !containsSub(s, "hook prompt --session sess-7 --port 9000 --format gemini") {
+		t.Errorf("hook command mal montado: %s", s)
+	}
+	if spec.Cleanup != nil {
+		_ = spec.Cleanup()
+	}
+}
+
+// Sem SelfExe/Port o settings sai sem hooks.
+func TestBuildInteractiveNoHookWithoutSelfExe(t *testing.T) {
+	dir := t.TempDir()
+	spec, err := New().BuildInteractive(adapter.SpawnOpts{
+		MCPURL:    "http://x/mcp",
+		ConfigDir: dir,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, _ := os.ReadFile(filepath.Join(dir, "gemini-settings.json"))
+	if containsSub(string(b), "BeforeTool") {
+		t.Errorf("não deveria injetar hook sem SelfExe/Port: %s", b)
+	}
+	if spec.Cleanup != nil {
+		_ = spec.Cleanup()
 	}
 }
 
