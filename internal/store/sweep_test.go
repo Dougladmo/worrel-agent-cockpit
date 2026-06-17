@@ -25,6 +25,38 @@ func TestPendingSweepSessions(t *testing.T) {
 	}
 }
 
+func TestSessionsNeedingSummary(t *testing.T) {
+	s := newTestStore(t)
+	p, _ := s.CreateProject("App", "")
+
+	// wrapper encerrada sem summary → entra
+	orphan, _ := s.CreateSession(&Session{ProjectID: p.ID, Adapter: "claude-code", Mode: "wrapper"})
+	s.EndSession(orphan.ID)
+
+	// wrapper encerrada COM summary → não entra
+	withSum, _ := s.CreateSession(&Session{ProjectID: p.ID, Adapter: "claude-code", Mode: "wrapper"})
+	s.EndSession(withSum.ID)
+	if err := s.SetSessionSummary(withSum.ID, "## Estado atual\nok"); err != nil {
+		t.Fatal(err)
+	}
+
+	// observed encerrada sem summary → não entra (só wrapper)
+	obs, _ := s.CreateSession(&Session{ProjectID: p.ID, Adapter: "claude-code", Mode: "observed"})
+	s.EndSession(obs.ID)
+
+	// wrapper ativa → não entra
+	active, _ := s.CreateSession(&Session{ProjectID: p.ID, Adapter: "claude-code", Mode: "wrapper"})
+	_ = active
+
+	need, err := s.SessionsNeedingSummary()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(need) != 1 || need[0].ID != orphan.ID {
+		t.Fatalf("need %+v", need)
+	}
+}
+
 func TestRecentlyUpdatedSkills(t *testing.T) {
 	s := newTestStore(t)
 	p, _ := s.CreateProject("App", "")

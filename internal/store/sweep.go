@@ -23,6 +23,26 @@ func (s *Store) PendingSweepSessions() ([]*Session, error) {
 	return out, rows.Err()
 }
 
+// SessionsNeedingSummary: sessões wrapper encerradas sem resumo (summary vazio).
+// Usado na recuperação de boot para gerar handoff de sessões órfãs.
+func (s *Store) SessionsNeedingSummary() ([]*Session, error) {
+	rows, err := s.db.Query(sessionCols +
+		` WHERE status='ended' AND mode='wrapper' AND (summary IS NULL OR summary='') ORDER BY started_at`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []*Session{}
+	for rows.Next() {
+		x, err := scanSession(rows)
+		if err != nil {
+			return nil, err
+		}
+		out = append(out, x)
+	}
+	return out, rows.Err()
+}
+
 func (s *Store) MarkSessionAnalyzed(id string) error {
 	_, err := s.db.Exec(`UPDATE sessions SET analyzed_at=? WHERE id=?`, now(), id)
 	return err

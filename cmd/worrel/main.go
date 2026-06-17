@@ -163,6 +163,14 @@ func main() {
 	applier := apply.New(st, mir, b)
 	eng.SetAutoApplier(applier)
 
+	// Recuperação de sessões órfãs: sessões wrapper que encerraram abruptamente
+	// (crash, terminal fechado, restart) ficam sem resumo e sem sugestões na fila,
+	// pois resumo e distill dependem de ação manual. Aqui, em background, geramos o
+	// resumo de handoff das órfãs sem summary e rodamos a varredura de distill, que
+	// cria as sugestões pendentes. Roda depois de SetAutoApplier para que o Sweep
+	// respeite a política de auto-aplicação.
+	go recoverPendingSessions(st, handoffGen, eng)
+
 	// Fase 8: serviço de análise retroativa. Observadores = adaptadores instalados
 	// (claude-code, opencode), que satisfazem retro.Observer; reusa engine + applier.
 	// retroHeadless (definido acima) mapeia provider→headless p/ override por run
@@ -231,6 +239,45 @@ func runJanitor(ctx context.Context, j *retention.Janitor) {
 			return
 		case <-t.C:
 			sweep()
+		}
+	}
+}
+
+// recoverPendingSessions roda, em background no boot, a recuperação de sessões
+// órfãs: gera o resumo de handoff das sessões wrapper encerradas sem summary e
+// dispara a varredura de distill (sugestões pendentes na fila). Idempotente: o
+// resumo só roda em quem está vazio e o Sweep deduplica contra sugestões pendentes.
+func recoverPendingSessions(st *store.Store, handoffGen *handoff.Generator, eng *distill.Engine) {
+	defer func() {
+		if r := recover(); r != nil {
+			log.Printf("recuperação de órfãs: panic recuperado: %v", r)
+		}
+	}()
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Minute)
+	defer cancel()
+
+	// 1) Resumos das sessões wrapper encerradas sem summary.
+	if handoffGen != nil {
+		sessions, err := st.SessionsNeedingSummary()
+		if err != nil {
+			log.Printf("recuperação de órfãs: erro ao listar sessões sem resumo: %v", err)
+		} else {
+			for _, sess := range sessions {
+				if _, err := handoffGen.GenerateSummary(ctx, sess.ID); err != nil {
+					log.Printf("recuperação de órfãs: resumo da sessão %s falhou: %v", sess.ID, err)
+					continue
+				}
+			}
+			if n := len(sessions); n > 0 {
+				log.Printf("recuperação de órfãs: %d resumo(s) gerado(s)", n)
+			}
+		}
+	}
+
+	// 2) Varredura de distill: cria sugestões pendentes para sessões não analisadas.
+	if eng != nil {
+		if _, err := eng.Sweep(ctx); err != nil {
+			log.Printf("recuperação de órfãs: varredura de distill falhou: %v", err)
 		}
 	}
 }
