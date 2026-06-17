@@ -496,15 +496,18 @@ func (m *Manager) SpawnWithAdapter(sessionID string, spec adapter.CmdSpec, ad ad
 	go func() {
 		m.trackContext(sessionID, ref, ad) // medição imediata no spawn
 		m.trackTitle(sessionID, ref, ad)
+		m.trackTranscript(sessionID, ref, ad)
 		m.trackAwaiting(sessionID, ref, ad)
 		ticker := time.NewTicker(contextPollInterval)
 		defer ticker.Stop()
 		for range ticker.C {
 			if !m.IsRunning(sessionID) {
+				m.trackTranscript(sessionID, ref, ad) // flush final ao encerrar
 				return
 			}
 			m.trackContext(sessionID, ref, ad)
 			m.trackTitle(sessionID, ref, ad)
+			m.trackTranscript(sessionID, ref, ad)
 			m.trackAwaiting(sessionID, ref, ad)
 		}
 	}()
