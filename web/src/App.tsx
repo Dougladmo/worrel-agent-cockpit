@@ -9,7 +9,7 @@ import AskBalloons from './components/AskBalloons';
 import Project from './pages/Project';
 import Settings from './pages/Settings';
 import Terminal from './pages/Terminal';
-import Retro from './pages/Retro';
+import Engines from './pages/Engines';
 import SecretApprovalModal from './components/SecretApprovalModal';
 import NewSessionModal from './components/NewSessionModal';
 import EmptyState from './shell/EmptyState';
@@ -184,19 +184,10 @@ function AppInner() {
       <>
         <Routes>
           <Route
-            path="/retro"
-            element={
-              <main className="app-layout" style={{ flexDirection: 'column', overflow: 'auto' }}>
-                <Retro />
-              </main>
-            }
-          />
-          <Route
             path="*"
             element={
               <EmptyState
                 onNewSession={() => setNewSessionProject(null)}
-                onAnalyzeHistory={() => navigate('/retro')}
               />
             }
           />
@@ -221,16 +212,14 @@ function AppInner() {
         liveIds={liveIds}
         awaitingIds={awaitingIds}
         onStarted={handleSessionCreated}
-        onAnalyzeHistory={() => navigate('/retro')}
       />
 
       <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
         <main style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
           <Routes>
-            <Route path="/" element={<Retro />} />
+            <Route path="/" element={<Engines />} />
             <Route path="/projects/:id" element={<Project />} />
             <Route path="/sessions/:id" element={<Terminal />} />
-            <Route path="/retro" element={<Retro />} />
             <Route path="/settings" element={<Settings />} />
           </Routes>
         </main>
