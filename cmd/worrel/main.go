@@ -138,7 +138,7 @@ func main() {
 		}
 	}
 
-	// Applier com bus para eventos de linhagem/auto-modo.
+	// Applier manual com bus para eventos de linhagem.
 	applier := apply.New(st, mir, b)
 
 	engines := engine.NewRegistry()
