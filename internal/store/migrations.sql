@@ -135,3 +135,11 @@ CREATE TABLE IF NOT EXISTS secret_suppressions (
   hash TEXT PRIMARY KEY,                         -- sha256 do valor cru; valor NUNCA armazenado
   created_at INTEGER NOT NULL
 );
+CREATE TABLE IF NOT EXISTS engine_config (
+  engine_id  TEXT NOT NULL,
+  scope_key  TEXT NOT NULL,            -- '' = global; senão project_id
+  key        TEXT NOT NULL,
+  value      TEXT NOT NULL,
+  updated_at INTEGER NOT NULL,
+  PRIMARY KEY (engine_id, scope_key, key)
+);
