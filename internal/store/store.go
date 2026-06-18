@@ -37,6 +37,10 @@ func Open(path string) (*Store, error) {
 		db.Close()
 		return nil, err
 	}
+	if err := st.openMigrateDemolitionSP1(); err != nil {
+		db.Close()
+		return nil, err
+	}
 	return st, nil
 }
 
