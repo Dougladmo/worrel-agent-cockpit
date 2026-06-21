@@ -140,6 +140,21 @@ func (s *Server) routesProjects() {
 		}
 		writeJSON(w, 200, v)
 	})
+	s.mux.HandleFunc("GET /api/projects/{id}/memory/entries", func(w http.ResponseWriter, r *http.Request) {
+		entries, err := s.deps.Store.ListMemoryEntries(r.PathValue("id"), false)
+		if err != nil {
+			writeErr(w, 500, err.Error())
+			return
+		}
+		writeJSON(w, 200, entries)
+	})
+	s.mux.HandleFunc("DELETE /api/projects/{id}/memory/entries/{eid}", func(w http.ResponseWriter, r *http.Request) {
+		if err := s.deps.Store.DeleteMemoryEntry(r.PathValue("eid")); err != nil {
+			writeErr(w, 500, err.Error())
+			return
+		}
+		writeJSON(w, 200, map[string]string{"status": "ok"})
+	})
 	s.mux.HandleFunc("GET /api/skills", func(w http.ResponseWriter, r *http.Request) {
 		list, err := s.deps.Store.ListSkills(r.URL.Query().Get("project_id"))
 		if err != nil {

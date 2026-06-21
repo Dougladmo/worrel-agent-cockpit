@@ -397,3 +397,59 @@ func TestErrorResponses(t *testing.T) {
 		t.Fatalf("second accept = %d, want 409", code)
 	}
 }
+
+func doDelete(t *testing.T, ts *httptest.Server, path string, out any) int {
+	t.Helper()
+	req, _ := http.NewRequest(http.MethodDelete, ts.URL+path, nil)
+	resp, err := ts.Client().Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer resp.Body.Close()
+	if out != nil {
+		_ = json.NewDecoder(resp.Body).Decode(out)
+	}
+	return resp.StatusCode
+}
+
+func TestMemoryEntriesAPI(t *testing.T) {
+	ts, s := newTestServer(t)
+
+	var projMap map[string]any
+	postJSON(t, ts, "/api/projects", map[string]any{"name": "MemEntries", "description": ""}, &projMap)
+	projID, _ := projMap["id"].(string)
+
+	// Insert two entries directly via store
+	a, _ := s.CreateMemoryEntry(&store.MemoryEntry{ProjectID: projID, Content: "entry A", Category: "convencao"})
+	b, _ := s.CreateMemoryEntry(&store.MemoryEntry{ProjectID: projID, Content: "entry B", Category: "gotcha"})
+
+	// GET /api/projects/{id}/memory/entries should return both
+	var entries []map[string]any
+	code := getJSON(t, ts, "/api/projects/"+projID+"/memory/entries", &entries)
+	if code != 200 {
+		t.Fatalf("GET entries = %d, want 200", code)
+	}
+	if len(entries) != 2 {
+		t.Fatalf("expected 2 entries, got %d", len(entries))
+	}
+
+	// DELETE entry a
+	var delResp map[string]any
+	code = doDelete(t, ts, "/api/projects/"+projID+"/memory/entries/"+a.ID, &delResp)
+	if code != 200 {
+		t.Fatalf("DELETE entry = %d, want 200", code)
+	}
+	if delResp["status"] != "ok" {
+		t.Fatalf("DELETE status = %v, want ok", delResp["status"])
+	}
+
+	// GET again: only entry b remains
+	var entries2 []map[string]any
+	getJSON(t, ts, "/api/projects/"+projID+"/memory/entries", &entries2)
+	if len(entries2) != 1 {
+		t.Fatalf("expected 1 entry after delete, got %d", len(entries2))
+	}
+	if entries2[0]["id"] != b.ID {
+		t.Fatalf("remaining entry id = %v, want %s", entries2[0]["id"], b.ID)
+	}
+}

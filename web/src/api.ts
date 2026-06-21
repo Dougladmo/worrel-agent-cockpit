@@ -16,6 +16,17 @@ export interface MemoryVersion {
   created_at: number;
 }
 
+export interface MemoryEntry {
+  id: string;
+  project_id: string;
+  content: string;
+  category: string;
+  evidence: string;
+  status: string;
+  superseded_by: string;
+  created_at: number;
+}
+
 export interface AskRequest {
   request_id: string;
   session_id: string;
@@ -162,6 +173,14 @@ export function revertMemory(projectId: string, versionId: number): Promise<Memo
     method: 'POST',
     body: JSON.stringify({ version_id: versionId }),
   });
+}
+
+export function listMemoryEntries(projectId: string): Promise<MemoryEntry[]> {
+  return req(`/projects/${projectId}/memory/entries`);
+}
+
+export function deleteMemoryEntry(projectId: string, entryId: string): Promise<{ status: string }> {
+  return req(`/projects/${projectId}/memory/entries/${entryId}`, { method: 'DELETE' });
 }
 
 export function listSkills(projectId?: string): Promise<Skill[]> {
