@@ -92,6 +92,8 @@ func migrateAddColumns(db *sql.DB) error {
 		// de texto e para adapters sem captura rica.
 		{"transcript_events", "payload",
 			`ALTER TABLE transcript_events ADD COLUMN payload TEXT NOT NULL DEFAULT ''`},
+		{"skills", "structured",
+			`ALTER TABLE skills ADD COLUMN structured TEXT NOT NULL DEFAULT ''`},
 	}
 	for _, w := range wanted {
 		var n int

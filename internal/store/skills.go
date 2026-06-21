@@ -19,6 +19,7 @@ type Skill struct {
 	EvolutionPolicy  string `json:"evolution_policy"`
 	Origin           string `json:"origin"`
 	Metadata         string `json:"metadata"`
+	Structured       string `json:"structured"`
 	LastUsedAt       int64  `json:"last_used_at"`
 }
 
@@ -60,10 +61,10 @@ func (s *Store) GetSkill(id string) (*Skill, error) {
 	sk := &Skill{}
 	err := s.db.QueryRow(`SELECT id, project_id, slug, name, content, created_at, updated_at,
 		COALESCE(active_generation,1), COALESCE(evolution_policy,'manual'), COALESCE(origin,'learned'),
-		COALESCE(metadata,'{}')
+		COALESCE(metadata,'{}'), COALESCE(structured,'')
 		FROM skills WHERE id=?`, id).
 		Scan(&sk.ID, &sk.ProjectID, &sk.Slug, &sk.Name, &sk.Content, &sk.CreatedAt, &sk.UpdatedAt,
-			&sk.ActiveGeneration, &sk.EvolutionPolicy, &sk.Origin, &sk.Metadata)
+			&sk.ActiveGeneration, &sk.EvolutionPolicy, &sk.Origin, &sk.Metadata, &sk.Structured)
 	if err != nil {
 		return nil, err
 	}
@@ -74,7 +75,7 @@ func (s *Store) GetSkill(id string) (*Skill, error) {
 func (s *Store) ListSkills(projectID string) ([]*Skill, error) {
 	q := `SELECT skills.id, skills.project_id, skills.slug, skills.name, skills.content, skills.created_at, skills.updated_at,
 		COALESCE(skills.active_generation,1), COALESCE(skills.evolution_policy,'manual'), COALESCE(skills.origin,'learned'),
-		COALESCE(skills.metadata,'{}'),
+		COALESCE(skills.metadata,'{}'), COALESCE(skills.structured,''),
 		COALESCE((SELECT MAX(u.started_at) FROM skill_usage u WHERE u.skill_id = skills.id), 0) AS last_used_at
 		FROM skills`
 	args := []any{}
@@ -93,7 +94,7 @@ func (s *Store) ListSkills(projectID string) ([]*Skill, error) {
 		sk := &Skill{}
 		if err := rows.Scan(&sk.ID, &sk.ProjectID, &sk.Slug, &sk.Name, &sk.Content,
 			&sk.CreatedAt, &sk.UpdatedAt, &sk.ActiveGeneration, &sk.EvolutionPolicy, &sk.Origin,
-			&sk.Metadata, &sk.LastUsedAt); err != nil {
+			&sk.Metadata, &sk.Structured, &sk.LastUsedAt); err != nil {
 			return nil, err
 		}
 		out = append(out, sk)
@@ -162,6 +163,11 @@ func (s *Store) SetSkillMetadata(id, metadataJSON string) error {
 		return sql.ErrNoRows
 	}
 	return nil
+}
+
+func (s *Store) SetSkillStructured(skillID, structured string) error {
+	_, err := s.db.Exec(`UPDATE skills SET structured=?, updated_at=? WHERE id=?`, structured, now(), skillID)
+	return err
 }
 
 func (s *Store) DeleteSkill(id string) error {
