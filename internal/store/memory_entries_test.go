@@ -45,3 +45,29 @@ func TestMemoryEntriesCRUDAndRender(t *testing.T) {
 		t.Fatalf("render faltando entrada ativa/seção: %q", r)
 	}
 }
+
+func TestDeleteMemoryEntry(t *testing.T) {
+	s := newTestStore(t)
+	p, _ := s.CreateProject("DeleteTest", "")
+
+	a, err := s.CreateMemoryEntry(&MemoryEntry{ProjectID: p.ID, Content: "entry A", Category: "convencao"})
+	if err != nil {
+		t.Fatalf("create a: %v", err)
+	}
+	b, err := s.CreateMemoryEntry(&MemoryEntry{ProjectID: p.ID, Content: "entry B", Category: "gotcha"})
+	if err != nil {
+		t.Fatalf("create b: %v", err)
+	}
+
+	if err := s.DeleteMemoryEntry(a.ID); err != nil {
+		t.Fatalf("delete: %v", err)
+	}
+
+	list, err := s.ListMemoryEntries(p.ID, false)
+	if err != nil {
+		t.Fatalf("list: %v", err)
+	}
+	if len(list) != 1 || list[0].ID != b.ID {
+		t.Fatalf("expected only b remaining, got %d entries", len(list))
+	}
+}

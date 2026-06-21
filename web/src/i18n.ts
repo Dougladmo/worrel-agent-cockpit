@@ -217,6 +217,7 @@ i18next
             content: 'Content',
             notePlaceholder: 'Describe this version...',
             contentPlaceholder: 'Memory content...',
+            entries: 'Golden-truth entries',
           },
           skills: {
             create: 'Create Skill',
@@ -676,6 +677,7 @@ i18next
             content: 'Conteúdo',
             notePlaceholder: 'Descreva esta versão...',
             contentPlaceholder: 'Conteúdo da memória...',
+            entries: 'Entradas golden-truth',
           },
           skills: {
             create: 'Criar Habilidade',

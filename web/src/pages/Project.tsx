@@ -7,6 +7,8 @@ import {
   saveMemory,
   listMemoryVersions,
   revertMemory,
+  listMemoryEntries,
+  deleteMemoryEntry,
   listSkills,
   createSkill,
   updateSkill,
@@ -23,7 +25,7 @@ import {
   importSkill,
   postHandoff,
 } from '../api';
-import type { Project as ProjectType, MemoryVersion, Skill, Session, Suggestion, DetectedAdapter, SkillStats } from '../api';
+import type { Project as ProjectType, MemoryVersion, MemoryEntry, Skill, Session, Suggestion, DetectedAdapter, SkillStats } from '../api';
 import SecretsTab from '../components/SecretsTab';
 import SkillHealth from '../components/SkillHealth';
 import Lineage from '../components/Lineage';
@@ -56,6 +58,7 @@ export default function Project() {
   const [memContent, setMemContent] = useState('');
   const [memNote, setMemNote] = useState('');
   const [versions, setVersions] = useState<MemoryVersion[]>([]);
+  const [memoryEntries, setMemoryEntries] = useState<MemoryEntry[]>([]);
 
   // Skills
   const [skills, setSkills] = useState<Skill[]>([]);
@@ -87,10 +90,11 @@ export default function Project() {
     async function loadAll(projectId: string) {
       setLoading(true);
       try {
-        const [proj, mem, vers, sk, sess, sugs, adps] = await Promise.all([
+        const [proj, mem, vers, entries, sk, sess, sugs, adps] = await Promise.all([
           getProject(projectId),
           getMemory(projectId).catch(() => null),
           listMemoryVersions(projectId).catch(() => [] as MemoryVersion[]),
+          listMemoryEntries(projectId).catch(() => [] as MemoryEntry[]),
           listSkills(projectId),
           listSessions(projectId),
           listSuggestions(projectId, 'pending'),
@@ -100,6 +104,7 @@ export default function Project() {
         setProject(proj);
         if (mem) { setMemContent(mem.content); }
         setVersions(vers);
+        setMemoryEntries(entries);
         setSkills(sk);
         void loadSkillStats(sk);
         setSessions(sess);
@@ -145,6 +150,14 @@ export default function Project() {
       const m = await revertMemory(id, versionId);
       setMemContent(m.content);
       setVersions(await listMemoryVersions(id));
+    });
+  }
+
+  function handleDeleteMemoryEntry(entryId: string) {
+    if (!id) return;
+    return run(async () => {
+      await deleteMemoryEntry(id, entryId);
+      setMemoryEntries(await listMemoryEntries(id));
     });
   }
 
@@ -336,6 +349,32 @@ export default function Project() {
 
       {tab === 'memory' && (
         <div>
+          {memoryEntries.length > 0 && (
+            <div className="card" style={{ marginBottom: '1.5rem' }}>
+              <h3 style={{ margin: '0 0 0.75rem' }}>{t('memory.entries')}</h3>
+              {(['convencao', 'arquitetura', 'gotcha', 'never_do', 'decisao'] as const).map((cat) => {
+                const items = memoryEntries.filter((e) => e.category === cat);
+                if (items.length === 0) return null;
+                const labels: Record<string, string> = { convencao: 'Convenções', arquitetura: 'Arquitetura', gotcha: 'Gotchas', never_do: 'Nunca faça', decisao: 'Decisões' };
+                return (
+                  <div key={cat} style={{ marginBottom: '0.75rem' }}>
+                    <strong style={{ fontSize: '0.85rem', color: 'var(--muted)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>{labels[cat]}</strong>
+                    {items.map((e) => (
+                      <div key={e.id} style={{ display: 'flex', alignItems: 'flex-start', gap: '0.5rem', marginTop: '0.35rem' }}>
+                        <span style={{ flex: 1, fontSize: '0.9rem' }}>— {e.content}</span>
+                        <button
+                          className="btn btn-danger"
+                          style={{ fontSize: '0.75rem', padding: '2px 8px', flexShrink: 0 }}
+                          disabled={busy}
+                          onClick={() => handleDeleteMemoryEntry(e.id)}
+                        >✕</button>
+                      </div>
+                    ))}
+                  </div>
+                );
+              })}
+            </div>
+          )}
           <label htmlFor="mem-content">{t('memory.content')}</label>
           <textarea
             id="mem-content"

@@ -75,6 +75,11 @@ func (s *Store) SupersedeMemoryEntry(oldID, newID string) error {
 	return err
 }
 
+func (s *Store) DeleteMemoryEntry(id string) error {
+	_, err := s.db.Exec("DELETE FROM memory_entries WHERE id = ?", id)
+	return err
+}
+
 // RenderMemory concatena as entradas ativas agrupadas por categoria num markdown
 // legível, consumido pela injeção-no-início. Vazio se não houver entradas.
 func (s *Store) RenderMemory(projectID string) (string, error) {
