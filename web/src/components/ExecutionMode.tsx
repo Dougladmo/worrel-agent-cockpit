@@ -27,8 +27,7 @@ const MODES: Mode[] = [
   {
     value: 'realtime',
     label: 'Ao vivo',
-    desc: 'Acompanha o stream e destila durante a sessão, em tempo real.',
-    soon: true,
+    desc: 'Destila durante a sessão (varre as sessões em andamento a cada ~2 min).',
     art: (
       <div className="exmode-art exmode-live" aria-hidden>
         <span className="exmode-live-dot" />
@@ -41,7 +40,6 @@ const MODES: Mode[] = [
     value: 'agent_self',
     label: 'O agente decide',
     desc: 'Injeta a regra no início; o próprio agente registra via MCP quando percebe algo.',
-    soon: true,
     art: (
       <div className="exmode-art exmode-agent" aria-hidden>
         <span className="exmode-spark" />

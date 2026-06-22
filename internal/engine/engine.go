@@ -18,6 +18,7 @@ const (
 	TriggerRealtime         Trigger = "realtime"
 	TriggerPeriodic         Trigger = "periodic"
 	TriggerProjectOpenClose Trigger = "project_open_close"
+	TriggerAgentSelf        Trigger = "agent_self"
 )
 
 // ConfigField descreve um campo editável (config ou prompt) de um motor.

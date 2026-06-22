@@ -23,7 +23,7 @@ func (e *Engine) Spec() eng.Spec {
 		ID:          "memory",
 		Name:        "Motor de Memória",
 		Description: "Destila golden truths anti-erro do transcript (padrão erro→correção) como entradas de memória.",
-		Triggers:    []eng.Trigger{eng.TriggerProjectOpenClose, eng.TriggerOnDemand},
+		Triggers:    []eng.Trigger{eng.TriggerProjectOpenClose, eng.TriggerRealtime, eng.TriggerAgentSelf, eng.TriggerOnDemand},
 		Prompts:     []eng.ConfigField{{Key: "prompt", Label: "Prompt do destilador", Type: "textarea", Default: defaultPrompt}},
 		Config: []eng.ConfigField{
 			{Key: "detection_mode", Label: "Modo de detecção", Type: "select", Default: "hybrid", Options: eng.DetectionModeOptions},

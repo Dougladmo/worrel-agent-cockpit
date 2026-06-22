@@ -62,5 +62,21 @@ func (s *Scheduler) Tick(ctx context.Context) {
 			}
 			_ = s.st.MarkEngineRun(spec.ID, sess.ID)
 		}
+
+		// Modo "ao vivo": roda o motor sobre as sessões EM ANDAMENTO a cada tick.
+		// Sem marca d'água (re-roda sempre); o dedup de sugestão evita spam.
+		active, err := s.st.ActiveSessions()
+		if err != nil {
+			continue
+		}
+		for _, sess := range active {
+			cfg, err := s.st.ResolveEngineConfig(spec.ID, sess.ProjectID, s.reg.Defaults(spec.ID))
+			if err != nil || cfg["__enabled"] != "true" || cfg["__trigger"] != string(engine.TriggerRealtime) {
+				continue
+			}
+			if err := s.reg.Run(ctx, s.st, spec.ID, sess.ProjectID, sess.ID); err != nil {
+				log.Printf("scheduler: motor %s sessão ativa %s: %v", spec.ID, sess.ID, err)
+			}
+		}
 	}
 }

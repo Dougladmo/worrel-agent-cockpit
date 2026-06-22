@@ -27,6 +27,15 @@ type Suggestion struct {
 }
 
 func (s *Store) CreateSuggestion(sg *Suggestion) (*Suggestion, error) {
+	// Dedup: não recria uma sugestão pendente idêntica (mesmo projeto+tipo+título).
+	// Torna re-execuções idempotentes — essencial p/ o modo "ao vivo", que roda o
+	// motor repetidamente sobre a sessão em andamento.
+	var dupID string
+	if err := s.db.QueryRow(`SELECT id FROM suggestions
+		WHERE COALESCE(project_id,'')=? AND type=? AND title=? AND status='pending' LIMIT 1`,
+		sg.ProjectID, sg.Type, sg.Title).Scan(&dupID); err == nil && dupID != "" {
+		return s.GetSuggestion(dupID)
+	}
 	sg.ID = uuid.NewString()
 	sg.Status = "pending"
 	sg.CreatedAt = now()

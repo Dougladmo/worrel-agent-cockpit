@@ -31,7 +31,7 @@ func (e *Engine) Spec() eng.Spec {
 		ID:          "friction",
 		Name:        "Motor de Fricção",
 		Description: "Roteia sinais de atrito para memória / nova skill / refinar skill ou agente / saúde de skill.",
-		Triggers:    []eng.Trigger{eng.TriggerProjectOpenClose, eng.TriggerOnDemand},
+		Triggers:    []eng.Trigger{eng.TriggerProjectOpenClose, eng.TriggerRealtime, eng.TriggerOnDemand},
 		Prompts:     []eng.ConfigField{{Key: "prompt", Label: "Prompt do roteador", Type: "textarea", Default: defaultPrompt}},
 		Config: []eng.ConfigField{
 			{Key: "detection_mode", Label: "Modo de detecção", Type: "select", Default: "hybrid", Options: eng.DetectionModeOptions},

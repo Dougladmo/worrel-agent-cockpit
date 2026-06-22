@@ -28,6 +28,27 @@ func (s *Store) UnrunEndedSessions(engineID string) ([]*Session, error) {
 	return out, rows.Err()
 }
 
+// ActiveSessions devolve as sessões em andamento (status='active'). Usado pelo
+// modo "ao vivo": o scheduler roda o motor sobre elas durante a sessão.
+func (s *Store) ActiveSessions() ([]*Session, error) {
+	rows, err := s.db.Query(`SELECT id, COALESCE(project_id,''), adapter, mode, title, status,
+		started_at, ended_at FROM sessions WHERE status='active' ORDER BY started_at`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	out := []*Session{}
+	for rows.Next() {
+		x := &Session{}
+		if err := rows.Scan(&x.ID, &x.ProjectID, &x.Adapter, &x.Mode, &x.Title, &x.Status,
+			&x.StartedAt, &x.EndedAt); err != nil {
+			return nil, err
+		}
+		out = append(out, x)
+	}
+	return out, rows.Err()
+}
+
 // MarkEngineRun registra que engineID processou sessionID (idempotente via OR IGNORE).
 func (s *Store) MarkEngineRun(engineID, sessionID string) error {
 	_, err := s.db.Exec(`INSERT OR IGNORE INTO engine_runs (engine_id, session_id, ran_at)

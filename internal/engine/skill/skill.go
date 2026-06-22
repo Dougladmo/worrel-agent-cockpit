@@ -31,7 +31,7 @@ func (e *Engine) Spec() eng.Spec {
 		ID:          "skill",
 		Name:        "Motor de Skill/Agente",
 		Description: "Detecta workflows dirigidos pelo usuário, acumula recorrência entre sessões e os matura em skills ou agentes.",
-		Triggers:    []eng.Trigger{eng.TriggerProjectOpenClose, eng.TriggerOnDemand},
+		Triggers:    []eng.Trigger{eng.TriggerProjectOpenClose, eng.TriggerRealtime, eng.TriggerOnDemand},
 		Prompts: []eng.ConfigField{
 			{Key: "skill_prompt", Label: "Prompt do rascunho de Skill", Type: "textarea", Default: defaultSkillPrompt},
 			{Key: "agent_prompt", Label: "Prompt do rascunho de Agente", Type: "textarea", Default: defaultAgentPrompt},

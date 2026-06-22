@@ -46,6 +46,23 @@ func BuildSpawnOpts(st *store.Store, wm *workspace.Manager, sessionID string, po
 			}
 			primer = rendered
 		}
+		// Modo "o agente decide": injeta a regra no início da sessão para o próprio
+		// agente registrar verdades anti-erro via MCP (suggest_memory) quando perceber.
+		mode, err := st.ResolveEngineConfig("memory", sess.ProjectID,
+			map[string]string{"__enabled": "false", "__trigger": "project_open_close"})
+		if err != nil {
+			return adapter.SpawnOpts{}, err
+		}
+		if mode["__enabled"] == "true" && mode["__trigger"] == "agent_self" {
+			rule := "## Memória anti-erro (auto-registro)\n" +
+				"Quando você perceber uma verdade anti-erro — um erro seguido de correção, " +
+				"ou uma regra que evita repetir um engano — registre-a já, durante a sessão, " +
+				"chamando a ferramenta MCP `suggest_memory` com um resumo curto (1-2 frases) e a categoria."
+			if primer != "" {
+				primer += "\n\n"
+			}
+			primer += rule
+		}
 	} else if workdir == "" {
 		// não-classificada sem workspace definido: cria scratch
 		ws, err := wm.ScratchWorkspace(sessionID)

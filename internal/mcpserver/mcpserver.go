@@ -62,6 +62,7 @@ func (svc *Service) ServerFor(token string) *mcp.Server {
 	svc.addSecretTools(srv, a)
 	svc.addAskTools(srv, a)
 	svc.addMarkAsSkillTools(srv, a)
+	svc.addSuggestMemoryTools(srv, a)
 	return srv
 }
 
