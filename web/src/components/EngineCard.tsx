@@ -80,7 +80,12 @@ export default function EngineCard({ item, setConfig, onRun }: {
           </div>
         ))}
 
-        {onRun && <button type="button" className="btn btn-primary" onClick={() => onRun(spec.id)}>Rodar sob demanda</button>}
+        {onRun && (
+          <div className="ec-run">
+            <button type="button" className="btn btn-primary" onClick={() => onRun(spec.id)}>▶ Rodar agora</button>
+            <span>Dispara o motor uma vez agora (modo sob demanda usa este botão).</span>
+          </div>
+        )}
       </fieldset>
     </div>
   )
@@ -115,5 +120,7 @@ const EC_CSS = `
 .ec-textarea { width: 100%; padding: 10px 12px; border-radius: 8px; border: 1.5px solid var(--line-strong, #3a3a3a);
   background: var(--surface-sunk, rgba(255,255,255,0.02)); color: inherit; font-family: var(--mono, monospace); font-size: 0.8rem; line-height: 1.5; resize: vertical; }
 .ec-textarea:focus { outline: none; border-color: var(--orange, #e08a3c); }
+.ec-run { display: flex; align-items: center; gap: 12px; margin-top: 4px; }
+.ec-run span { font-size: 0.78rem; color: var(--muted, #999); }
 @media (max-width: 640px) { .ec-cards { grid-template-columns: 1fr; } }
 `

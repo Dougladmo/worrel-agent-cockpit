@@ -33,11 +33,12 @@ export default function Settings() {
       method: 'PUT', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ key, value }),
     }).then(loadEngines);
+  // Rodar sob demanda: dispara o motor e mostra o resultado na aba Atividade.
   const runEngine = (id: string) =>
     fetch(`/api/engines/${id}/run`, {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ project_id: '', session_id: prompt('session_id?') || '' }),
-    }).then(() => {}).catch(() => {});
+      body: JSON.stringify({ project_id: '', session_id: '' }),
+    }).then(() => { setTab('atividade'); loadActivity(); }).catch(() => {});
 
   useEffect(() => { loadEngines(); }, []);
   useEffect(() => { if (tab === 'atividade') loadActivity(); }, [tab]);
