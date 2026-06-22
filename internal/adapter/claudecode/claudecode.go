@@ -25,15 +25,19 @@ type Adapter struct {
 	// ProjectsRoot é o diretório raiz dos projetos Claude Code.
 	// Vazio = ~/.claude/projects (default). Configurável para testes (fase 4).
 	ProjectsRoot string
+	// userClaudeDir é a raiz ~/.claude do usuário, usada para descobrir os
+	// comandos "/" nativos. Vazio = ~/.claude (default). Configurável para testes.
+	userClaudeDir string
 }
 
 // New cria um novo adaptador Claude Code.
 func New() *Adapter {
-	root := ""
+	root, claudeDir := "", ""
 	if home, err := os.UserHomeDir(); err == nil {
-		root = filepath.Join(home, ".claude", "projects")
+		claudeDir = filepath.Join(home, ".claude")
+		root = filepath.Join(claudeDir, "projects")
 	}
-	return &Adapter{ProjectsRoot: root}
+	return &Adapter{ProjectsRoot: root, userClaudeDir: claudeDir}
 }
 
 func (a *Adapter) ID() string { return "claude-code" }
