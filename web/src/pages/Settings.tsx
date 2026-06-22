@@ -16,6 +16,7 @@ export default function Settings() {
   // Config dos motores de destilação (mesma fonte do wizard de onboarding).
   const [engines, setEngines] = useState<EngineItem[]>([]);
   const [showWizard, setShowWizard] = useState(false);
+  const [tab, setTab] = useState('geral');
   const loadEngines = () =>
     fetch('/api/engines').then(r => r.json()).then(setEngines).catch(() => setEngines([]));
   const setEngineConfig = (id: string, key: string, value: string) =>
@@ -102,49 +103,59 @@ export default function Settings() {
   if (showWizard) return <OnboardingWizard onClose={closeWizard} />;
   if (loading) return <div className="main"><p>{t('common.loading')}</p></div>;
 
+  const engine = engines.find(e => e.spec.id === tab);
+
   return (
     <div className="main">
-      <div className="page-head"><div><h1>{t('nav.settings')}</h1></div></div>
-      <div className="card" style={{ maxWidth: '480px' }}>
-        <label htmlFor="set-retention" style={{ display: 'block', marginBottom: '0.25rem' }}>{t('settings.retentionDays')}</label>
-        <input
-          id="set-retention"
-          type="number"
-          min={1}
-          value={retentionDays}
-          onChange={(e) => setRetentionDays(e.target.value)}
-          style={{ marginBottom: '1rem' }}
-        />
-
-        {error && <p className="error-banner">{t('common.actionFailed')}</p>}
-        <button className="btn btn-primary" disabled={busy} onClick={handleSave}>{t('settings.save')}</button>
-        {saved && <span style={{ marginLeft: '1rem', color: 'var(--green)', fontWeight: 600 }}>{t('settings.saved')}</span>}
+      <div className="page-head">
+        <div><h1>{t('nav.settings')}</h1></div>
+        <button className="btn btn-secondary" onClick={() => setShowWizard(true)}>{t('settings.configureEngines', 'Abrir assistente')}</button>
       </div>
 
-      <div style={{ marginTop: '2rem' }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', maxWidth: '760px' }}>
-          <h2 style={{ margin: 0 }}>{t('settings.engines', 'Motores')}</h2>
-          <button className="btn btn-secondary" onClick={() => setShowWizard(true)}>{t('settings.configureEngines', 'Abrir assistente')}</button>
-        </div>
-        <p style={{ color: 'var(--muted)', maxWidth: '760px' }}>
-          {t('settings.enginesHint', 'Ative, configure e ajuste os prompts de cada motor de destilação.')}
-        </p>
+      <div className="tabs">
+        <button className={`tab${tab === 'geral' ? ' active' : ''}`} onClick={() => setTab('geral')}>{t('settings.tabGeral', 'Geral')}</button>
         {engines.map(it => (
-          <EngineCard key={it.spec.id} item={it} setConfig={setEngineConfig} onRun={runEngine} />
+          <button key={it.spec.id} className={`tab${tab === it.spec.id ? ' active' : ''}`} onClick={() => setTab(it.spec.id)}>
+            {it.spec.name}
+          </button>
         ))}
       </div>
 
-      <div className="card" style={{ maxWidth: '480px', marginTop: '1.5rem', borderColor: 'var(--red)' }}>
-        <h2 style={{ marginTop: 0, color: 'var(--red)' }}>Zona de perigo</h2>
-        <p style={{ marginTop: 0, color: 'var(--muted)' }}>
-          Reinicia a configuração do zero: apaga projetos, memórias, skills, pipelines,
-          sugestões, sessões, segredos, histórico de chat e configurações. Preserva o
-          esquema do banco e a chave-mestra do sistema. Ação irreversível.
-        </p>
-        <button className="btn btn-danger" disabled={resetting} onClick={handleReset}>
-          {resetting ? 'Reiniciando…' : 'Reiniciar configuração do zero'}
-        </button>
-      </div>
+      {tab === 'geral' && (
+        <>
+          <div className="card" style={{ maxWidth: '480px' }}>
+            <label htmlFor="set-retention" style={{ display: 'block', marginBottom: '0.25rem' }}>{t('settings.retentionDays')}</label>
+            <input
+              id="set-retention"
+              type="number"
+              min={1}
+              value={retentionDays}
+              onChange={(e) => setRetentionDays(e.target.value)}
+              style={{ marginBottom: '1rem' }}
+            />
+
+            {error && <p className="error-banner">{t('common.actionFailed')}</p>}
+            <button className="btn btn-primary" disabled={busy} onClick={handleSave}>{t('settings.save')}</button>
+            {saved && <span style={{ marginLeft: '1rem', color: 'var(--green)', fontWeight: 600 }}>{t('settings.saved')}</span>}
+          </div>
+
+          <div className="card" style={{ maxWidth: '480px', marginTop: '1.5rem', borderColor: 'var(--red)' }}>
+            <h2 style={{ marginTop: 0, color: 'var(--red)' }}>Zona de perigo</h2>
+            <p style={{ marginTop: 0, color: 'var(--muted)' }}>
+              Reinicia a configuração do zero: apaga projetos, memórias, skills, pipelines,
+              sugestões, sessões, segredos, histórico de chat e configurações. Preserva o
+              esquema do banco e a chave-mestra do sistema. Ação irreversível.
+            </p>
+            <button className="btn btn-danger" disabled={resetting} onClick={handleReset}>
+              {resetting ? 'Reiniciando…' : 'Reiniciar configuração do zero'}
+            </button>
+          </div>
+        </>
+      )}
+
+      {engine && (
+        <EngineCard item={engine} setConfig={setEngineConfig} onRun={runEngine} />
+      )}
     </div>
   );
 }
