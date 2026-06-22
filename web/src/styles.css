@@ -1491,15 +1491,15 @@ tr:last-child td { border-bottom: none; }
   font-family: var(--display); font-weight: 700; color: var(--ink); margin-bottom: 8px;
   overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
 }
-/* altura fixa: espaço reservado para os 3 últimos eventos narrados */
+/* altura fixa: espaço para 3 eventos narrados, ATÉ 2 linhas cada */
 .tcard-timeline {
-  list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px;
-  height: 78px; overflow: hidden;
+  list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 7px;
+  height: 124px; overflow: hidden;
 }
 .tcard-timeline li {
   font-size: 0.85rem; color: var(--ink-soft); line-height: 1.35;
-  padding-left: 14px; position: relative;
-  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+  padding-left: 14px; position: relative; flex-shrink: 0;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden;
 }
 .tcard-timeline li::before {
   content: ''; position: absolute; left: 0; top: 7px;
@@ -1784,13 +1784,13 @@ tr:last-child td { border-bottom: none; }
 }
 .appnav-term:hover { background: var(--surface-warm); color: var(--ink); }
 .appnav-term.active { background: var(--surface-warm); color: var(--ink); }
-.appnav-term-top { display: flex; justify-content: flex-end; min-height: 13px; }
+.appnav-term-top { display: flex; justify-content: space-between; align-items: center; min-height: 14px; }
 .appnav-term-name {
   display: flex; align-items: center; gap: 6px; color: var(--ink-soft);
   min-width: 0; line-height: 1.3; padding-left: 1px;
 }
 .appnav-term-label { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.appnav-term-time { align-self: flex-end; font-family: var(--mono); font-size: 0.6rem; color: var(--faint); }
+.appnav-term-time { font-family: var(--mono); font-size: 0.6rem; color: var(--faint); }
 .appnav-term-top .provider-badge { font-size: 0.52rem; padding: 0 5px; line-height: 1.4; }
 /* terminal ATIVO: bolinha verde cintilante à esquerda do título */
 .appnav-live-dot {

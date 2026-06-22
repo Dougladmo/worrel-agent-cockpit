@@ -254,7 +254,8 @@ func (s *Session) handleAssistant(ev map[string]any) {
 		case "text":
 			if t := strings.TrimSpace(asString(bm["text"])); t != "" {
 				s.message = t
-				s.progress = appendCapped(s.progress, t, 3)
+				// NÃO vira progress: o card mostra EVENTOS NARRADOS (gerados pelo
+				// summarizer), não as mensagens cruas. Aqui só guardamos o histórico.
 				s.history = append(s.history, agui.HistoryLine{Role: "ai", Text: t})
 			}
 		case "tool_use":
@@ -352,10 +353,3 @@ func summarizeInput(v any) string {
 	return str
 }
 
-func appendCapped(xs []string, x string, n int) []string {
-	xs = append(xs, x)
-	if len(xs) > n {
-		xs = xs[len(xs)-n:]
-	}
-	return xs
-}

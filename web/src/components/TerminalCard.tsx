@@ -23,6 +23,9 @@ interface Props {
 // da IA; 3) summary persistido; 4) placeholder.
 function timelineLines(s: Session, snapshot: InteractionSnapshot | undefined, fallback: string): string[] {
   if (snapshot?.progress && snapshot.progress.length > 0) return snapshot.progress.slice(0, 3);
+  // Sessão do motor: o card mostra SÓ os eventos narrados; enquanto não chegam,
+  // fica o placeholder — nunca as mensagens cruas trocadas.
+  if (s.adapter === 'engine') return [fallback];
   const lines: string[] = [];
   if (snapshot?.user_message) lines.push(snapshot.user_message);
   if (snapshot?.message) lines.push(snapshot.message);
