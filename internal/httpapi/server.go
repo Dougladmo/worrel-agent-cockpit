@@ -11,6 +11,7 @@ import (
 	"github.com/eduardoworrel/worrel-agent-cockpit/internal/engine"
 	"github.com/eduardoworrel/worrel-agent-cockpit/internal/mirror"
 	"github.com/eduardoworrel/worrel-agent-cockpit/internal/store"
+	"github.com/eduardoworrel/worrel-agent-cockpit/internal/streamengine"
 	"github.com/eduardoworrel/worrel-agent-cockpit/internal/vault"
 	"github.com/eduardoworrel/worrel-agent-cockpit/internal/workspace"
 	"github.com/eduardoworrel/worrel-agent-cockpit/internal/wrapper"
@@ -31,15 +32,19 @@ type Deps struct {
 	Spawner   Spawner               // optional; nil = handoff indisponível
 	Ask       *ask.Broker           // pedidos de confirmação/escolha (balões); nil = indisponível
 	Engines *engine.Registry // framework de motores (SP1); nil = indisponível
+	Summarizer HeadlessLLM    // LLM headless p/ resumo de progresso da Home; nil = indisponível
+	Engine *streamengine.Manager // motor stream-json (sessões dirigidas pela Home); nil = indisponível
 }
 
 type Server struct {
-	deps Deps
-	mux  *http.ServeMux
+	deps      Deps
+	mux       *http.ServeMux
+	progress  *progressCache  // cache do resumo por IA por sessão (canal AG-UI/Home)
+	interpret *interpretCache // cache da interpretação de turnos-fala (auto-mode)
 }
 
 func New(deps Deps) *Server {
-	s := &Server{deps: deps, mux: http.NewServeMux()}
+	s := &Server{deps: deps, mux: http.NewServeMux(), progress: newProgressCache(), interpret: newInterpretCache()}
 	s.routes()
 	return s
 }
@@ -61,6 +66,8 @@ func (s *Server) routes() {
 	s.routesLineage()
 	s.routesSkillPkg()
 	s.routesSessions()
+	s.routesEngineSessions()
+	s.routesInteraction()
 	s.routesModels()
 	s.routesSecrets()
 	s.routesHandoff()

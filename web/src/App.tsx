@@ -8,12 +8,15 @@ import type { DistillResult, AskRequest } from './api';
 import AskBalloons from './components/AskBalloons';
 import Project from './pages/Project';
 import Settings from './pages/Settings';
-import Terminal from './pages/Terminal';
+import SessionRoute from './pages/SessionRoute';
 import Engines from './pages/Engines';
 import SecretApprovalModal from './components/SecretApprovalModal';
-import NewSessionModal from './components/NewSessionModal';
+import NewSessionWizard from './components/NewSessionWizard';
+import InteractionStyleOnboarding from './components/InteractionStyleOnboarding';
+import { hasChosenInteractionStyle } from './interactionStyle';
 import EmptyState from './shell/EmptyState';
-import ProjectSidebar from './shell/ProjectSidebar';
+import AppNav from './shell/AppNav';
+import Home from './pages/Home';
 import SuggestionsDrawer from './shell/SuggestionsDrawer';
 import { useAppState } from './shell/useAppState';
 import type { Session } from './api';
@@ -47,7 +50,8 @@ function AppInner() {
   const navigate = useNavigate();
   const { loading, projects, wrapperSessions, liveIds, isEmpty, reload } = useAppState();
   const [approval, setApproval] = useState<ApprovalRequest | null>(null);
-  const [newSessionProject, setNewSessionProject] = useState<string | null | undefined>(undefined);
+  const [showWizard, setShowWizard] = useState(false);
+  const [needStyle, setNeedStyle] = useState(!hasChosenInteractionStyle());
   const [reloadKey, setReloadKey] = useState(0);
   const [extract, setExtract] = useState<ExtractState | null>(null);
   const [asks, setAsks] = useState<AskRequest[]>([]);
@@ -171,11 +175,15 @@ function AppInner() {
     </div>
   );
 
-  function handleSessionCreated(sess: Session) {
-    setNewSessionProject(undefined);
+  // openTerminal=true abre o terminal; senão fica na Home, onde a sessão vira a
+  // miniatura AG-UI no card. Default true (abrir) para chamadas legadas.
+  function handleSessionCreated(sess: Session, openTerminal = true) {
+    setShowWizard(false);
     reload();
-    navigate(`/sessions/${sess.id}`);
+    navigate(openTerminal ? `/sessions/${sess.id}` : '/');
   }
+
+  const liveSessions = wrapperSessions.filter((s) => liveIds.has(s.id));
 
   if (loading) return <div className="app-layout" />;
 
@@ -187,13 +195,13 @@ function AppInner() {
             path="*"
             element={
               <EmptyState
-                onNewSession={() => setNewSessionProject(null)}
+                onNewSession={() => setShowWizard(true)}
               />
             }
           />
         </Routes>
-        {newSessionProject !== undefined && (
-          <NewSessionModal onCreated={handleSessionCreated} onClose={() => setNewSessionProject(undefined)} />
+        {showWizard && (
+          <NewSessionWizard onCreated={handleSessionCreated} onClose={() => setShowWizard(false)} />
         )}
         {approval && (
           <SecretApprovalModal requestId={approval.requestId} secretName={approval.secretName} onDone={() => setApproval(null)} />
@@ -206,20 +214,22 @@ function AppInner() {
 
   return (
     <div className="app-layout">
-      <ProjectSidebar
-        projects={projects}
-        wrapperSessions={wrapperSessions}
-        liveIds={liveIds}
-        awaitingIds={awaitingIds}
-        onStarted={handleSessionCreated}
-      />
+      <AppNav projects={projects} sessions={wrapperSessions} liveIds={liveIds} awaitingIds={awaitingIds} />
 
       <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
         <main style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
           <Routes>
-            <Route path="/" element={<Engines />} />
+            <Route path="/" element={
+              <Home
+                liveSessions={liveSessions}
+                awaitingIds={awaitingIds}
+                onNewSession={() => setShowWizard(true)}
+                reloadKey={reloadKey}
+              />
+            } />
+            <Route path="/engines" element={<Engines />} />
             <Route path="/projects/:id" element={<Project />} />
-            <Route path="/sessions/:id" element={<Terminal />} />
+            <Route path="/sessions/:id" element={<SessionRoute sessions={wrapperSessions} />} />
             <Route path="/settings" element={<Settings />} />
           </Routes>
         </main>
@@ -227,6 +237,10 @@ function AppInner() {
 
       <SuggestionsDrawer activeProjectId={activeProjectId} projects={projects} reloadKey={reloadKey} />
 
+      {showWizard && (
+        <NewSessionWizard onCreated={handleSessionCreated} onClose={() => setShowWizard(false)} />
+      )}
+      {needStyle && <InteractionStyleOnboarding onChosen={() => setNeedStyle(false)} />}
       {approval && (
         <SecretApprovalModal requestId={approval.requestId} secretName={approval.secretName} onDone={() => setApproval(null)} />
       )}

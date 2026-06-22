@@ -513,13 +513,29 @@ export interface ToolCall {
   summary?: string;
 }
 
+export interface HistoryLine {
+  role: 'you' | 'ai' | 'tool' | 'system';
+  text: string;
+}
+
 export interface InteractionSnapshot {
   session_id: string;
   state: InteractionState;
   message?: string;        // última fala/pergunta da IA
   user_message?: string;   // último pedido do usuário
   tool_calls?: ToolCall[]; // o que a IA fez
+  progress?: string[];     // resumo narrado por IA (timeline do card)
+  history?: HistoryLine[]; // transcript completo (visão de conversa)
   interrupt?: Interrupt;   // pergunta bloqueante pendente
+}
+
+// createEngineSession cria uma sessão dirigida pelo motor stream-json (sem PTY):
+// a Home a gerencia 100% pelo canal AG-UI.
+export function createEngineSession(projectId?: string): Promise<Session> {
+  return req('/sessions/engine', {
+    method: 'POST',
+    body: JSON.stringify({ project_id: projectId ?? '' }),
+  });
 }
 
 export function getInteraction(sessionId: string): Promise<InteractionSnapshot> {

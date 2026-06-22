@@ -30,7 +30,10 @@ import (
 	"github.com/eduardoworrel/worrel-agent-cockpit/internal/mcpserver"
 	"github.com/eduardoworrel/worrel-agent-cockpit/internal/mirror"
 	"github.com/eduardoworrel/worrel-agent-cockpit/internal/retention"
+	"github.com/eduardoworrel/worrel-agent-cockpit/internal/scheduler"
+	"github.com/eduardoworrel/worrel-agent-cockpit/internal/agui"
 	"github.com/eduardoworrel/worrel-agent-cockpit/internal/store"
+	"github.com/eduardoworrel/worrel-agent-cockpit/internal/streamengine"
 	"github.com/eduardoworrel/worrel-agent-cockpit/internal/vault"
 	"github.com/eduardoworrel/worrel-agent-cockpit/internal/workspace"
 	"github.com/eduardoworrel/worrel-agent-cockpit/internal/wrapper"
@@ -142,6 +145,18 @@ func main() {
 		}
 	}
 
+	// Motor stream-json: dirige sessões 100% pelo protocolo do CLI (sem PTY/ask/
+	// hook). onChange publica interaction.changed; ao encerrar, fecha a sessão no
+	// store para sair da faixa de vivas da Home.
+	var engineMgr *streamengine.Manager
+	engineMgr = streamengine.NewManager(func(id string) {
+		b.Publish(bus.Event{Type: "interaction.changed", Payload: map[string]any{"session_id": id}})
+		if snap, ok := engineMgr.Snapshot(id); ok && snap.State == agui.StateEnded {
+			_ = st.EndSession(id)
+			b.Publish(bus.Event{Type: "session.ended", Payload: map[string]any{"id": id}})
+		}
+	})
+
 	// Applier manual com bus para eventos de linhagem.
 	applier := apply.New(st, mir, b)
 
@@ -149,6 +164,10 @@ func main() {
 	engines.Register(memory.New(cc))
 	engines.Register(skill.New(cc))
 	engines.Register(friction.New(cc))
+
+	// Scheduler: dispara motores HABILITADOS sobre sessões encerradas (uma vez
+	// cada). Nada roda por default — só motores com __enabled=true na config.
+	go scheduler.New(engines, st).Start(context.Background(), 2*time.Minute)
 
 	srv := httpapi.New(httpapi.Deps{
 		Store:     st,
@@ -166,6 +185,7 @@ func main() {
 		Ask:       askBroker,
 		Engines:   engines,
 		Summarizer: headlessAdapter,
+		Engine:    engineMgr,
 	})
 
 	url := fmt.Sprintf("http://%s", ln.Addr().String())

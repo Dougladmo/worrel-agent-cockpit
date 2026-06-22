@@ -1,0 +1,118 @@
+import { useCallback, useEffect, useRef, useState } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { useTranslation } from 'react-i18next';
+import { getInteraction, sendPrompt, respondInteraction, killSession } from '../api';
+import type { InteractionSnapshot } from '../api';
+import { useEvents } from '../useEvents';
+
+// SessionStream é a "interface de terminal" de uma sessão dirigida pelo MOTOR
+// (stream-json): não há PTY/xterm — mostramos o HISTÓRICO da conversa (você, IA,
+// ferramentas, decisões), a permissão pendente e um campo para mandar prompts.
+export default function SessionStream() {
+  const { id } = useParams<{ id: string }>();
+  const { t } = useTranslation();
+  const navigate = useNavigate();
+  const [snap, setSnap] = useState<InteractionSnapshot | null>(null);
+  const [text, setText] = useState('');
+  const [busy, setBusy] = useState(false);
+  const bodyRef = useRef<HTMLDivElement>(null);
+
+  const load = useCallback(() => {
+    if (!id) return;
+    getInteraction(id).then(setSnap).catch(() => { /* ignore */ });
+  }, [id]);
+
+  useEffect(() => { load(); }, [load]);
+  useEvents(useCallback((ev) => {
+    const p = ev.payload as { session_id?: string; id?: string };
+    if ((p?.session_id === id || p?.id === id) &&
+      ['interaction.changed', 'session.awaiting', 'session.busy', 'session.ended'].includes(ev.type)) {
+      load();
+    }
+  }, [id, load]));
+
+  // rola para o fim quando o histórico cresce.
+  useEffect(() => {
+    bodyRef.current?.scrollTo({ top: bodyRef.current.scrollHeight });
+  }, [snap?.history?.length, snap?.interrupt]);
+
+  async function act(fn: () => Promise<unknown>) {
+    if (busy) return;
+    setBusy(true);
+    try { await fn(); load(); } catch { /* noop */ } finally { setBusy(false); }
+  }
+
+  function submit() {
+    if (!id || !text.trim()) return;
+    const t = text.trim();
+    setText('');
+    act(() => sendPrompt(id, t));
+  }
+
+  const interrupt = snap?.interrupt;
+  const state = snap?.state ?? 'working';
+  const history = snap?.history ?? [];
+
+  return (
+    <div className="sstream">
+      <header className="sstream-head">
+        <button className="btn btn-secondary btn-sm" onClick={() => navigate('/')}>← {t('home.nav.home')}</button>
+        <span className="ixp-state" data-state={state}>{t(`home.ix.state.${state}`)}</span>
+        <span className="sstream-engine">engine</span>
+        <button className="btn btn-danger btn-sm" style={{ marginLeft: 'auto' }}
+          onClick={() => id && act(() => killSession(id).then(() => navigate('/')))}>
+          {t('terminal.kill')}
+        </button>
+      </header>
+
+      <div className="sstream-body" ref={bodyRef}>
+        {history.length === 0 && <div className="sstream-empty">{t('home.ix.working')}</div>}
+        {history.map((h, i) => (
+          <div key={i} className={`sstream-line role-${h.role}`}>
+            <span className="sstream-role">{roleLabel(h.role, t)}</span>
+            <span className="sstream-text">{h.text}</span>
+          </div>
+        ))}
+        {state === 'working' && history.length > 0 && (
+          <div className="sstream-line role-system"><span className="sstream-role" /><span className="sstream-text sstream-thinking">…</span></div>
+        )}
+      </div>
+
+      {interrupt ? (
+        <div className="sstream-foot sstream-permission">
+          <div className="sstream-perm-q">{interrupt.prompt}</div>
+          {interrupt.detail && <pre className="ixp-detail">{interrupt.detail}</pre>}
+          <div className="ixp-actions">
+            <button className="btn btn-primary btn-sm" disabled={busy}
+              onClick={() => id && act(() => respondInteraction(id, interrupt.request_id, 'allow'))}>{t('ask.allow')}</button>
+            <button className="btn btn-danger btn-sm" disabled={busy}
+              onClick={() => id && act(() => respondInteraction(id, interrupt.request_id, 'deny'))}>{t('ask.deny')}</button>
+          </div>
+        </div>
+      ) : (
+        <div className="sstream-foot">
+          <span className="nsw-prompt-glyph" aria-hidden="true">›</span>
+          <textarea
+            className="sstream-input"
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            onKeyDown={(e) => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); submit(); } }}
+            placeholder={t('home.ix.promptPlaceholder')}
+            rows={2}
+            autoFocus
+          />
+          <button className="btn btn-primary btn-sm" disabled={busy || !text.trim()} onClick={submit}>{t('home.ix.send')}</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function roleLabel(role: string, t: (k: string) => string): string {
+  switch (role) {
+    case 'you': return t('home.ix.youAsked').replace(':', '');
+    case 'ai': return 'IA';
+    case 'tool': return '⚙';
+    default: return '·';
+  }
+}

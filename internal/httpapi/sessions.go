@@ -184,6 +184,10 @@ func (s *Server) handleActiveSessions(w http.ResponseWriter, r *http.Request) {
 
 func (s *Server) handleKillSession(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
+	// Sessão do motor: encerra o processo stream-json.
+	if s.deps.Engine != nil && s.deps.Engine.Has(id) {
+		s.deps.Engine.Close(id)
+	}
 	// Best-effort: mata o PTY se ainda estiver vivo NESTE processo. Após um
 	// restart do servidor o processo não existe mais no mapa em memória — isso
 	// não é erro (a sessão fica "órfã": active no banco, sem PTY vivo).

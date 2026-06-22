@@ -104,6 +104,11 @@ func writeHookSettings(selfExe, sessionID string, port int) (string, func() erro
 }
 
 func (a *Adapter) BuildInteractive(opts adapter.SpawnOpts) (adapter.CmdSpec, error) {
+	// Pré-confia o workspace para o claude não parar no "trust this folder?"
+	// (workspaces _scratch novos não têm a flag) — senão a sessão fica presa no
+	// diálogo e nada digitado/injetado chega ao agente.
+	ensureFolderTrusted(opts.WorkingDir)
+
 	args := []string{}
 	if opts.SessionID != "" {
 		args = append(args, "--session-id", opts.SessionID)
