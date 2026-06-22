@@ -20,10 +20,9 @@ func NewManager(onChange func(string)) *Manager {
 	return &Manager{sessions: map[string]*Session{}, onChange: onChange}
 }
 
-// Start spawna e registra uma sessão do motor no cwd dado, no modo de permissão
-// indicado (vazio = acceptEdits/auto-mode).
-func (m *Manager) Start(ctx context.Context, sessionID, cwd string, mode PermissionMode) error {
-	s, err := Start(ctx, sessionID, cwd, mode, m.onChange)
+// Start spawna e registra uma sessão do motor no cwd dado, com as opções.
+func (m *Manager) Start(ctx context.Context, sessionID, cwd string, o Opts) error {
+	s, err := Start(ctx, sessionID, cwd, o, m.onChange)
 	if err != nil {
 		return err
 	}

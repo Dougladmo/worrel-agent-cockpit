@@ -24,7 +24,7 @@ function TerminalGlyph() {
   );
 }
 
-type Mode = 'on-demand' | 'from-begin';
+type Mode = 'inicio' | 'consulta';
 
 // NewSessionWizard inicia uma sessão em dois passos, dentro de uma "janela de
 // terminal": a window-chrome carrega o ambiente (modo + provider), e o corpo
@@ -44,7 +44,7 @@ export default function NewSessionWizard({ onCreated, onClose }: Props) {
 
   // projectId: undefined = nada escolhido; null = "sem projeto" (sessão livre).
   const [projectId, setProjectId] = useState<string | null | undefined>(undefined);
-  const [mode, setMode] = useState<Mode>('on-demand');
+  const [mode, setMode] = useState<Mode>('inicio');
   const [adapterId, setAdapterId] = useState('');
   const [permMode, setPermMode] = useState<PermissionMode>('auto');
   // seed: a semente da sessão — nada, uma skill ou um agent.
@@ -92,7 +92,7 @@ export default function NewSessionWizard({ onCreated, onClose }: Props) {
     try {
       // Toda sessão é dirigida pelo motor stream-json (auto-mode). openTerminal
       // só decide a navegação: ficar na Home (miniatura) ou abrir a conversa.
-      const sess = await createEngineSession(projectId ?? undefined, permMode);
+      const sess = await createEngineSession(projectId ?? undefined, permMode, mode);
       if (prompt.trim()) await sendPrompt(sess.id, prompt.trim());
       onCreated(sess, openTerminal);
     } catch (err) {
@@ -168,14 +168,14 @@ export default function NewSessionWizard({ onCreated, onClose }: Props) {
               <div className="nsw-field">
                 <span className="nsw-field-label">{t('home.wizard.mode')}</span>
                 <div className="nsw-modes">
-                  {(['on-demand', 'from-begin'] as Mode[]).map((m) => (
+                  {(['inicio', 'consulta'] as Mode[]).map((m) => (
                     <button key={m} className={`nsw-mode${mode === m ? ' on' : ''}`}
                       onClick={() => setMode(m)} aria-pressed={mode === m}>
                       <span className="nsw-mode-name">
-                        {t(m === 'on-demand' ? 'home.wizard.onDemand' : 'home.wizard.fromBegin')}
+                        {t(m === 'inicio' ? 'home.wizard.fromBegin' : 'home.wizard.onDemand')}
                       </span>
                       <span className="nsw-mode-desc">
-                        {t(m === 'on-demand' ? 'home.wizard.onDemandDesc' : 'home.wizard.fromBeginDesc')}
+                        {t(m === 'inicio' ? 'home.wizard.fromBeginDesc' : 'home.wizard.onDemandDesc')}
                       </span>
                     </button>
                   ))}
@@ -185,7 +185,7 @@ export default function NewSessionWizard({ onCreated, onClose }: Props) {
           ) : (
             <div className="nsw-panel" key="s2">
               <button className="nsw-crumb" onClick={() => setStep(1)}>
-                ← <b>{projectLabel}</b> · {t(mode === 'on-demand' ? 'home.wizard.onDemand' : 'home.wizard.fromBegin')}
+                ← <b>{projectLabel}</b> · {t(mode === 'inicio' ? 'home.wizard.fromBegin' : 'home.wizard.onDemand')}
               </button>
 
               <h3 className="nsw-q">{t('home.wizard.skillsAgents')}</h3>

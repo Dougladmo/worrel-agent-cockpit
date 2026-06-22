@@ -52,13 +52,20 @@ type Session struct {
 // "dontAsk", "plan".
 type PermissionMode = string
 
-// claudeArgs são os flags provados: stream-json bidirecional + permissão via stdio,
-// no modo dado (vazio = "auto").
-func claudeArgs(mode PermissionMode) []string {
+// Opts configura uma sessão do motor.
+type Opts struct {
+	Mode         PermissionMode // modo de permissão ("auto" se vazio)
+	SystemAppend string         // memória injetada no início (--append-system-prompt)
+	MCPURL       string         // MCP do worrel p/ a sessão CONSULTAR a memória sob demanda
+}
+
+// claudeArgs são os flags provados: stream-json bidirecional + permissão via stdio.
+func claudeArgs(o Opts) []string {
+	mode := o.Mode
 	if mode == "" {
 		mode = "auto"
 	}
-	return []string{
+	args := []string{
 		"-p",
 		"--input-format", "stream-json",
 		"--output-format", "stream-json",
@@ -70,12 +77,24 @@ func claudeArgs(mode PermissionMode) []string {
 		// FALAR a pergunta — que a interpretação por IA renderiza em opções.
 		"--disallowedTools", "AskUserQuestion",
 	}
+	if o.SystemAppend != "" {
+		args = append(args, "--append-system-prompt", o.SystemAppend)
+	}
+	if o.MCPURL != "" {
+		args = append(args, "--mcp-config", mcpConfigJSON(o.MCPURL))
+	}
+	return args
 }
 
-// Start spawna o claude no cwd no modo de permissão dado e começa a ler o stream.
+// mcpConfigJSON é o JSON inline do --mcp-config (servidor worrel via http stream).
+func mcpConfigJSON(url string) string {
+	return `{"mcpServers":{"worrel":{"type":"http","url":"` + url + `"}}}`
+}
+
+// Start spawna o claude no cwd com as opções dadas e começa a ler o stream.
 // onChange é notificado a cada transição (pode ser nil).
-func Start(ctx context.Context, sessionID, cwd string, mode PermissionMode, onChange func(string)) (*Session, error) {
-	cmd := exec.CommandContext(ctx, "claude", claudeArgs(mode)...)
+func Start(ctx context.Context, sessionID, cwd string, o Opts, onChange func(string)) (*Session, error) {
+	cmd := exec.CommandContext(ctx, "claude", claudeArgs(o)...)
 	cmd.Dir = cwd
 	stdin, err := cmd.StdinPipe()
 	if err != nil {

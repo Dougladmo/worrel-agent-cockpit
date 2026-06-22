@@ -22,7 +22,7 @@ func TestEngineLive(t *testing.T) {
 	defer cancel()
 
 	changes := make(chan struct{}, 64)
-	s, err := Start(ctx, "live-1", cwd, "default", func(string) { select {
+	s, err := Start(ctx, "live-1", cwd, Opts{Mode: "default"}, func(string) { select {
 		case changes <- struct{}{}:
 		default:
 		} })

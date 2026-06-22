@@ -533,12 +533,17 @@ export interface InteractionSnapshot {
 // quando precisa); 'default' = pergunta toda ferramenta; 'bypassPermissions' = nunca.
 export type PermissionMode = 'auto' | 'default' | 'acceptEdits' | 'bypassPermissions' | 'plan';
 
+// MemoryMode: 'inicio' injeta a memória do projeto no começo; 'consulta' deixa o
+// agente buscar a memória sob demanda (via MCP).
+export type MemoryMode = 'inicio' | 'consulta';
+
 // createEngineSession cria uma sessão dirigida pelo motor stream-json (sem PTY):
-// a Home a gerencia 100% pelo canal AG-UI. mode = modo de permissão do CC.
-export function createEngineSession(projectId?: string, mode?: PermissionMode): Promise<Session> {
+// a Home a gerencia 100% pelo canal AG-UI. mode = permissão do CC; memory = como
+// a memória do projeto entra na sessão.
+export function createEngineSession(projectId?: string, mode?: PermissionMode, memory?: MemoryMode): Promise<Session> {
   return req('/sessions/engine', {
     method: 'POST',
-    body: JSON.stringify({ project_id: projectId ?? '', mode: mode ?? 'auto' }),
+    body: JSON.stringify({ project_id: projectId ?? '', mode: mode ?? 'auto', memory: memory ?? 'inicio' }),
   });
 }
 
