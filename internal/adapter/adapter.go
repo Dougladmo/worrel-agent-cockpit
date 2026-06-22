@@ -107,6 +107,25 @@ type ModelLister interface {
 	ListModels(ctx context.Context) ([]string, error)
 }
 
+// SlashCommand descreve um comando "/" nativo do CLI descoberto no disco
+// (ex.: /sc:analyze vindo de ~/.claude/commands/sc/analyze.md). Trigger já inclui
+// a barra e o namespace; Description vem do frontmatter quando disponível; Source
+// distingue a origem ("user" = ~/.claude do usuário, "project" = .claude do repo).
+type SlashCommand struct {
+	Trigger     string `json:"trigger"`
+	Description string `json:"description"`
+	Source      string `json:"source"`
+}
+
+// SlashCommandLister é uma capacidade OPCIONAL: adaptadores cujo CLI suporta
+// comandos "/" definidos por arquivo (Claude Code) a implementam para que a UI
+// ofereça autocomplete. workingDir é o cwd da sessão (vazio = só comandos de
+// usuário); o adapter varre o nível de usuário e, se houver workingDir, também o
+// nível de projeto. Degrada retornando ([]SlashCommand{}, nil) quando não há nada.
+type SlashCommandLister interface {
+	ListSlashCommands(ctx context.Context, workingDir string) ([]SlashCommand, error)
+}
+
 // InputWaiter é implementado por adaptadores que sabem dizer se o CLI terminou
 // um turno e está aguardando o usuário (uma resposta ou uma confirmação).
 // Opcional: adaptadores sem suporte simplesmente não acionam o alerta na sidebar.

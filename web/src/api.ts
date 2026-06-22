@@ -188,6 +188,19 @@ export function listSkills(projectId?: string): Promise<Skill[]> {
   return req(`/skills${qs}`);
 }
 
+// SlashCommand: comando "/" nativo do CLI descoberto no disco (ex.: /sc:analyze).
+export interface SlashCommand {
+  trigger: string;
+  description: string;
+  source: string; // "user" | "project"
+}
+
+export function listSlashCommands(adapterId: string, dir?: string): Promise<SlashCommand[]> {
+  const qs = dir ? `?dir=${encodeURIComponent(dir)}` : '';
+  return req<{ commands: SlashCommand[] }>(`/adapters/${adapterId}/slash-commands${qs}`)
+    .then((r) => r.commands ?? []);
+}
+
 export function createSkill(projectId: string, name: string, content: string): Promise<Skill> {
   return req(`/projects/${projectId}/skills`, {
     method: 'POST',

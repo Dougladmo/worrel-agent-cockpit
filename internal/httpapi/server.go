@@ -70,6 +70,7 @@ func (s *Server) routes() {
 	s.routesEngineSessions()
 	s.routesInteraction()
 	s.routesModels()
+	s.routesSlashCommands()
 	s.routesSecrets()
 	s.routesHandoff()
 	s.routesPipelines()
