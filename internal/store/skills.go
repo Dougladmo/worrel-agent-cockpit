@@ -166,8 +166,14 @@ func (s *Store) SetSkillMetadata(id, metadataJSON string) error {
 }
 
 func (s *Store) SetSkillStructured(skillID, structured string) error {
-	_, err := s.db.Exec(`UPDATE skills SET structured=?, updated_at=? WHERE id=?`, structured, now(), skillID)
-	return err
+	res, err := s.db.Exec(`UPDATE skills SET structured=?, updated_at=? WHERE id=?`, structured, now(), skillID)
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return sql.ErrNoRows
+	}
+	return nil
 }
 
 func (s *Store) DeleteSkill(id string) error {

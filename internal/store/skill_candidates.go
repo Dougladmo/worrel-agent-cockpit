@@ -66,7 +66,9 @@ func (s *Store) upsertCandidate(projectID, signature, title, draft string, occ C
 	}
 	// existe: dedupe por session_id
 	var ev []CandidateOccurrence
-	_ = json.Unmarshal([]byte(c.Evidence), &ev)
+	if c.Evidence != "" && c.Evidence != "null" {
+		_ = json.Unmarshal([]byte(c.Evidence), &ev)
+	}
 	seen := false
 	for _, e := range ev {
 		if e.SessionID != "" && e.SessionID == occ.SessionID {

@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"hash/fnv"
 	"strconv"
 
 	eng "github.com/eduardoworrel/worrel-agent-cockpit/internal/engine"
@@ -11,6 +12,13 @@ import (
 	"github.com/eduardoworrel/worrel-agent-cockpit/internal/engine/skill"
 	"github.com/eduardoworrel/worrel-agent-cockpit/internal/store"
 )
+
+// hashStr: hash fnv32a hex do conteúdo (assinatura heurística estável por conteúdo).
+func hashStr(s string) string {
+	h := fnv.New32a()
+	_, _ = h.Write([]byte(s))
+	return fmt.Sprintf("%x", h.Sum32())
+}
 
 const defaultPrompt = `Roteie cada sinal de atrito para o destino certo (memory/new/refine_skill/refine_agent/health), preenchendo só o sub-objeto do destino. Use IDs existentes do contexto.`
 
@@ -182,7 +190,7 @@ func heuristicRoute(signals []Signal, healthOf map[string]string) []Decision {
 		case "error_then_success":
 			out = append(out, Decision{Destino: "memory", Memory: MemoryAction{Content: s.Text, Category: "gotcha"}, Evidence: s.Kind})
 		case "user_steps":
-			out = append(out, Decision{Destino: "new", Skill: SkillAction{Title: clip(s.Text), Signature: "heur-" + fmt.Sprintf("%x", len(s.Text))}, Evidence: s.Kind})
+			out = append(out, Decision{Destino: "new", Skill: SkillAction{Title: clip(s.Text), Signature: "heur-" + hashStr(s.Text)}, Evidence: s.Kind})
 		case "health":
 			out = append(out, Decision{Destino: "health", Health: HealthAction{SkillID: healthOf[s.Text], Action: "suspend"}, Evidence: s.Kind})
 		}

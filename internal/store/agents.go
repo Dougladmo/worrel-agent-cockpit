@@ -1,6 +1,7 @@
 package store
 
 import (
+	"database/sql"
 	"regexp"
 	"strings"
 
@@ -28,9 +29,10 @@ func agentSlug(name string) string {
 }
 
 func (s *Store) CreateAgent(projectID, name, persona, evidence string) (*Agent, error) {
+	ts := now()
 	a := &Agent{
 		ID: uuid.NewString(), ProjectID: projectID, Slug: agentSlug(name),
-		Name: name, Persona: persona, Evidence: evidence, CreatedAt: now(), UpdatedAt: now(),
+		Name: name, Persona: persona, Evidence: evidence, CreatedAt: ts, UpdatedAt: ts,
 	}
 	_, err := s.db.Exec(`INSERT INTO agents (id, project_id, slug, name, persona, evidence, created_at, updated_at)
 		VALUES (?,?,?,?,?,?,?,?)`, a.ID, a.ProjectID, a.Slug, a.Name, a.Persona, a.Evidence, a.CreatedAt, a.UpdatedAt)
@@ -67,6 +69,12 @@ func (s *Store) ListAgents(projectID string) ([]*Agent, error) {
 }
 
 func (s *Store) DeleteAgent(id string) error {
-	_, err := s.db.Exec(`DELETE FROM agents WHERE id=?`, id)
-	return err
+	res, err := s.db.Exec(`DELETE FROM agents WHERE id=?`, id)
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return sql.ErrNoRows
+	}
+	return nil
 }

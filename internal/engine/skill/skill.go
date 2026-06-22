@@ -4,11 +4,20 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"hash/fnv"
 	"strconv"
 
 	eng "github.com/eduardoworrel/worrel-agent-cockpit/internal/engine"
 	"github.com/eduardoworrel/worrel-agent-cockpit/internal/store"
 )
+
+// hashStr devolve um hash fnv32a hex do conteúdo — usado p/ assinatura heurística
+// estável por CONTEÚDO (não por tamanho, que colidiria fluxos distintos).
+func hashStr(s string) string {
+	h := fnv.New32a()
+	_, _ = h.Write([]byte(s))
+	return fmt.Sprintf("%x", h.Sum32())
+}
 
 const defaultSkillPrompt = `Redija como WORKFLOW: passos numerados que o usuário dirigiu, inputs declarados, edge cases, critério de conclusão. content = markdown legível; structured = JSON {inputs,steps,edge_cases,completion,own_memory}. own_memory = gotchas/notas do fluxo.`
 const defaultAgentPrompt = `Redija como PERSONA/PAPEL: quem o agente é, expertise, postura e regras de comportamento — NÃO uma tarefa a executar. persona = texto do system prompt.`
@@ -134,7 +143,7 @@ func heuristicDraft(w WorkflowWindow) Draft {
 		}
 	}
 	title := "Fluxo: " + fmt.Sprintf("%v", cmds)
-	sig := "heur-" + fmt.Sprintf("%x", len(title))
+	sig := "heur-" + hashStr(title)
 	content := "## Passos\n"
 	for _, c := range cmds {
 		content += "- " + c + "\n"

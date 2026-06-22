@@ -16,7 +16,7 @@ type WorkflowWindow struct {
 }
 
 // stepMarkers são pistas de que o usuário ENUMEROU passos (não só um objetivo).
-var stepMarkers = regexp.MustCompile(`(?i)\b(primeiro|depois|ent[ãa]o|em seguida|por fim|passo\s*\d|step\s*\d|1\.|2\.|3\.)\b`)
+var stepMarkers = regexp.MustCompile(`(?i)\b(primeiro|depois|ent[ãa]o|em seguida|por fim|passo\s*\d+|step\s*\d+|\d+\.)\b`)
 
 func isToolUse(e *store.TranscriptEvent) bool {
 	return e.Kind == "tool_use"
