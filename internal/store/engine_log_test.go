@@ -20,3 +20,25 @@ func TestEngineLogHasInputOutputColumns(t *testing.T) {
 		}
 	}
 }
+
+func TestLogEngineRunPersistsInputOutput(t *testing.T) {
+	st, err := Open(t.TempDir() + "/t.db")
+	if err != nil {
+		t.Fatalf("open: %v", err)
+	}
+	defer st.Close()
+	if err := st.LogEngineRun(&EngineLogEntry{
+		EngineID: "summary", SessionID: "s1",
+		Trigger: "realtime", Suggestions: 0, Detail: "",
+		Input: "PROMPT-X", Output: "RESPOSTA-Y",
+	}); err != nil {
+		t.Fatalf("log: %v", err)
+	}
+	got, err := st.ListEngineLog(10)
+	if err != nil {
+		t.Fatalf("list: %v", err)
+	}
+	if len(got) != 1 || got[0].Input != "PROMPT-X" || got[0].Output != "RESPOSTA-Y" {
+		t.Fatalf("input/output não persistiram: %+v", got)
+	}
+}
