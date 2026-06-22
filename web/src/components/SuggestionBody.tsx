@@ -242,6 +242,8 @@ export default function SuggestionBody({ sg, skills }: Props) {
     if (norm === 'add.memory' || norm === 'add.correction') return 'add_memory';
     if (norm === 'add.memory.entry') return 'add_memory_entry';
     if (norm === 'skill.or.agente.candidate') return 'skill_or_agente_candidate';
+    if (norm === 'agent.correction') return 'agent_correction';
+    if (norm === 'skill.health') return 'skill_health';
     if (norm === 'create.project') return 'create_project';
     if (norm === 'secret.detected') return 'secret.detected';
     // Any other skill-family type still renders as a skill rather than raw JSON:
@@ -341,6 +343,30 @@ export default function SuggestionBody({ sg, skills }: Props) {
         <div>
           <Label>{t('suggestions.memoryEntry')}</Label>
           <ContentPreview text={content} />
+        </div>
+      );
+    }
+
+    case 'agent_correction': {
+      const persona = str('persona');
+      const summary = str('change_summary');
+      return (
+        <div>
+          <Label>{t('suggestions.refineAgent', 'Refinar agente')}</Label>
+          {summary && <div style={{ fontSize: '0.82rem', color: 'var(--muted)' }}>{summary}</div>}
+          {persona ? <ContentPreview text={persona} /> : <RawFallback text={sg.payload} />}
+        </div>
+      );
+    }
+
+    case 'skill_health': {
+      const action = str('action');
+      const evidence = str('evidence');
+      return (
+        <div>
+          <Label>{t('suggestions.skillHealth', 'Saúde de skill')}</Label>
+          <div style={{ fontSize: '0.85rem' }}>{t('suggestions.healthAction', 'Ação')}: {action || 'suspend'}</div>
+          {evidence && <div style={{ fontSize: '0.82rem', color: 'var(--muted)' }}>{evidence}</div>}
         </div>
       );
     }
