@@ -6,6 +6,7 @@ package engine
 import (
 	"context"
 	"fmt"
+	"strings"
 
 	"github.com/eduardoworrel/worrel-agent-cockpit/internal/store"
 )
@@ -113,7 +114,32 @@ func (r *Registry) Run(ctx context.Context, st *store.Store, engineID, projectID
 	if err != nil {
 		return err
 	}
-	return e.Run(ctx, RunContext{ProjectID: projectID, SessionID: sessionID, Config: cfg, Store: st})
+	// Snapshot das sugestões antes, p/ registrar no log quais nasceram nesta
+	// execução (explicabilidade).
+	beforeIDs := map[string]bool{}
+	if before, e := st.ListSuggestions(projectID, ""); e == nil {
+		for _, s := range before {
+			beforeIDs[s.ID] = true
+		}
+	}
+	runErr := e.Run(ctx, RunContext{ProjectID: projectID, SessionID: sessionID, Config: cfg, Store: st})
+	var created []string
+	if after, e := st.ListSuggestions(projectID, ""); e == nil {
+		for _, s := range after {
+			if !beforeIDs[s.ID] {
+				created = append(created, s.Title)
+			}
+		}
+	}
+	detail := strings.Join(created, "; ")
+	if runErr != nil {
+		detail = "erro: " + runErr.Error()
+	}
+	_ = st.LogEngineRun(&store.EngineLogEntry{
+		EngineID: engineID, ProjectID: projectID, SessionID: sessionID,
+		Trigger: cfg["__trigger"], Suggestions: len(created), Detail: detail,
+	})
+	return runErr
 }
 
 // Defaults devolve o mapa de config-default de um motor, incluindo as chaves

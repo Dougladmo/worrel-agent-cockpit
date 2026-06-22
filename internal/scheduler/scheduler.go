@@ -53,6 +53,9 @@ func (s *Scheduler) Tick(ctx context.Context) {
 			if cfg["__enabled"] != "true" {
 				continue // desabilitado p/ este projeto: não roda nem marca (roda se habilitar depois)
 			}
+			if cfg["__trigger"] == string(engine.TriggerOnDemand) {
+				continue // modo sob demanda: só roda via ação explícita do usuário, nunca automático
+			}
 			if err := s.reg.Run(ctx, s.st, spec.ID, sess.ProjectID, sess.ID); err != nil {
 				log.Printf("scheduler: motor %s sessão %s: %v", spec.ID, sess.ID, err)
 				continue // erro: não marca, retenta no próximo tick

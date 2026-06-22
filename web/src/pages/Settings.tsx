@@ -3,6 +3,10 @@ import { useTranslation } from 'react-i18next';
 import { getSettings, putSettings, listProjects, listSessions } from '../api';
 import EngineCard, { type EngineItem } from '../components/EngineCard';
 import OnboardingWizard from '../components/OnboardingWizard';
+import { getInteractionStyle, setInteractionStyle } from '../interactionStyle';
+import type { InteractionStyle } from '../interactionStyle';
+
+type EngineLogEntry = { id: number; engine_id: string; trigger: string; suggestions: number; detail: string; created_at: number };
 
 export default function Settings() {
   const { t } = useTranslation();
@@ -17,6 +21,11 @@ export default function Settings() {
   const [engines, setEngines] = useState<EngineItem[]>([]);
   const [showWizard, setShowWizard] = useState(false);
   const [tab, setTab] = useState('geral');
+  const [activity, setActivity] = useState<EngineLogEntry[]>([]);
+  const loadActivity = () =>
+    fetch('/api/engines/activity').then(r => r.json()).then(setActivity).catch(() => setActivity([]));
+  const [ixStyle, setIxStyle] = useState<InteractionStyle>(getInteractionStyle());
+  const chooseStyle = (s: InteractionStyle) => { setInteractionStyle(s); setIxStyle(s); };
   const loadEngines = () =>
     fetch('/api/engines').then(r => r.json()).then(setEngines).catch(() => setEngines([]));
   const setEngineConfig = (id: string, key: string, value: string) =>
@@ -31,6 +40,7 @@ export default function Settings() {
     }).then(() => {}).catch(() => {});
 
   useEffect(() => { loadEngines(); }, []);
+  useEffect(() => { if (tab === 'atividade') loadActivity(); }, [tab]);
 
   // Primeiro uso: abre o wizard automaticamente (sem projetos/sessões e ainda não visto).
   useEffect(() => {
@@ -119,6 +129,7 @@ export default function Settings() {
             {it.spec.name}
           </button>
         ))}
+        <button className={`tab${tab === 'atividade' ? ' active' : ''}`} onClick={() => setTab('atividade')}>{t('settings.tabActivity', 'Atividade')}</button>
       </div>
 
       {tab === 'geral' && (
@@ -139,6 +150,23 @@ export default function Settings() {
             {saved && <span style={{ marginLeft: '1rem', color: 'var(--green)', fontWeight: 600 }}>{t('settings.saved')}</span>}
           </div>
 
+          <div className="card" style={{ maxWidth: '480px', marginTop: '1.5rem' }}>
+            <h2 style={{ marginTop: 0 }}>{t('settings.layout', 'Layout')}</h2>
+            <p style={{ marginTop: 0, color: 'var(--muted)' }}>{t('onboardingStyle.subtitle')}</p>
+            <div className="onb-style-options">
+              <button className={`onb-style-opt${ixStyle === 'modal' ? ' on' : ''}`} onClick={() => chooseStyle('modal')}>
+                <span className="onb-style-art onb-style-modal"><i /></span>
+                <b>{t('onboardingStyle.modal')}</b>
+                <span>{t('onboardingStyle.modalDesc')}</span>
+              </button>
+              <button className={`onb-style-opt${ixStyle === 'drawer' ? ' on' : ''}`} onClick={() => chooseStyle('drawer')}>
+                <span className="onb-style-art onb-style-drawer"><i /></span>
+                <b>{t('onboardingStyle.drawer')}</b>
+                <span>{t('onboardingStyle.drawerDesc')}</span>
+              </button>
+            </div>
+          </div>
+
           <div className="card" style={{ maxWidth: '480px', marginTop: '1.5rem', borderColor: 'var(--red)' }}>
             <h2 style={{ marginTop: 0, color: 'var(--red)' }}>Zona de perigo</h2>
             <p style={{ marginTop: 0, color: 'var(--muted)' }}>
@@ -155,6 +183,31 @@ export default function Settings() {
 
       {engine && (
         <EngineCard item={engine} setConfig={setEngineConfig} onRun={runEngine} />
+      )}
+
+      {tab === 'atividade' && (
+        <div className="card" style={{ maxWidth: '760px' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <h2 style={{ margin: 0 }}>{t('settings.activityTitle', 'Atividade dos motores')}</h2>
+            <button className="btn btn-secondary" onClick={loadActivity}>{t('common.refresh', 'Atualizar')}</button>
+          </div>
+          <p style={{ marginTop: '0.4rem', color: 'var(--muted)' }}>
+            {t('settings.activityHint', 'Cada execução de motor e as sugestões que gerou (explicabilidade).')}
+          </p>
+          {activity.length === 0 && <p style={{ color: 'var(--muted)' }}>{t('settings.activityEmpty', 'Nenhuma execução ainda.')}</p>}
+          {activity.map(a => (
+            <div key={a.id} style={{ borderTop: '1px solid var(--border, #333)', padding: '0.5rem 0' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', gap: '1rem' }}>
+                <strong>{engines.find(e => e.spec.id === a.engine_id)?.spec.name ?? a.engine_id}</strong>
+                <span style={{ color: 'var(--muted)', fontSize: '0.8rem' }}>{new Date(a.created_at).toLocaleString()}</span>
+              </div>
+              <div style={{ fontSize: '0.85rem', color: 'var(--muted)' }}>
+                gatilho: {a.trigger || '—'} · {a.suggestions} sugestão(ões)
+              </div>
+              {a.detail && <div style={{ fontSize: '0.85rem', marginTop: '0.2rem' }}>{a.detail}</div>}
+            </div>
+          ))}
+        </div>
       )}
     </div>
   );

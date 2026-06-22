@@ -171,6 +171,16 @@ CREATE TABLE IF NOT EXISTS engine_runs (
   ran_at     INTEGER NOT NULL,
   PRIMARY KEY (engine_id, session_id)
 );
+CREATE TABLE IF NOT EXISTS engine_log (
+  id          INTEGER PRIMARY KEY AUTOINCREMENT,
+  engine_id   TEXT NOT NULL,
+  project_id  TEXT,
+  session_id  TEXT,
+  trigger     TEXT NOT NULL DEFAULT '',
+  suggestions INTEGER NOT NULL DEFAULT 0,
+  detail      TEXT NOT NULL DEFAULT '',
+  created_at  INTEGER NOT NULL
+);
 CREATE TABLE IF NOT EXISTS engine_config (
   engine_id  TEXT NOT NULL,
   scope_key  TEXT NOT NULL,            -- '' = global; senão project_id

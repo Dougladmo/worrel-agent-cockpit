@@ -28,6 +28,15 @@ func (s *Server) routesEngines() {
 		writeJSON(w, http.StatusOK, out)
 	})
 
+	s.mux.HandleFunc("GET /api/engines/activity", func(w http.ResponseWriter, r *http.Request) {
+		log, err := s.deps.Store.ListEngineLog(100)
+		if err != nil {
+			writeErr(w, http.StatusInternalServerError, err.Error())
+			return
+		}
+		writeJSON(w, http.StatusOK, log)
+	})
+
 	s.mux.HandleFunc("PUT /api/engines/{id}/config", func(w http.ResponseWriter, r *http.Request) {
 		if s.deps.Engines == nil {
 			writeErr(w, http.StatusServiceUnavailable, "motores indisponíveis")
