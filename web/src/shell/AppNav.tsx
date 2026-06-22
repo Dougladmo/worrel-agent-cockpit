@@ -53,6 +53,7 @@ export default function AppNav({ projects, sessions, liveIds, awaitingIds }: Pro
       </div>
       <nav className="appnav-links">
         <NavLink to="/" end className="appnav-link">{t('home.nav.home')}</NavLink>
+        <NavLink to="/engines" className="appnav-link">{t('nav.engines', 'Motores')}</NavLink>
         <span className="appnav-link disabled">{t('home.nav.metrics')}</span>
         <span className="appnav-link disabled">{t('home.nav.joystick')}</span>
         <span className="appnav-link disabled">{t('home.nav.lab')}</span>
