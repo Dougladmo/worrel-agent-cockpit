@@ -15,6 +15,7 @@ import (
 	"github.com/eduardoworrel/worrel-agent-cockpit/internal/adapter"
 	"github.com/eduardoworrel/worrel-agent-cockpit/internal/adapter/claudecode"
 	"github.com/eduardoworrel/worrel-agent-cockpit/internal/engine"
+	"github.com/eduardoworrel/worrel-agent-cockpit/internal/engine/friction"
 	"github.com/eduardoworrel/worrel-agent-cockpit/internal/engine/memory"
 	"github.com/eduardoworrel/worrel-agent-cockpit/internal/engine/skill"
 	"github.com/eduardoworrel/worrel-agent-cockpit/internal/adapter/codex"
@@ -126,8 +127,10 @@ func main() {
 	// Handoff: usa o primeiro adaptador headless disponível (preferência: claude-code).
 	var handoffGen *handoff.Generator
 	var spawner *wrapperSpawner
+	var headlessAdapter adapter.Adapter // mesmo adapter headless serve o resumo da Home
 	for _, adID := range []string{"claude-code", "opencode"} {
 		if ad, ok := reg.Get(adID); ok && ad.Capabilities().Headless {
+			headlessAdapter = ad
 			sum := handoff.NewAdapterSummarizer(ad)
 			// O mesmo adaptador lê o transcript ao vivo do .jsonl da sessão in-app
 			// (que não é ingerida em transcript_events) — sem isso o resumo de
@@ -145,6 +148,7 @@ func main() {
 	engines := engine.NewRegistry()
 	engines.Register(memory.New(cc))
 	engines.Register(skill.New(cc))
+	engines.Register(friction.New(cc))
 
 	srv := httpapi.New(httpapi.Deps{
 		Store:     st,
@@ -161,6 +165,7 @@ func main() {
 		Spawner:   spawner,
 		Ask:       askBroker,
 		Engines:   engines,
+		Summarizer: headlessAdapter,
 	})
 
 	url := fmt.Sprintf("http://%s", ln.Addr().String())
