@@ -74,7 +74,8 @@ func TestListAndGetProjects(t *testing.T) {
 func TestMemoryAndSkills(t *testing.T) {
 	svc, s, _ := setup(t)
 	p, _ := s.CreateProject("App", "")
-	s.SaveMemory(p.ID, "# Convenções\n- use tabs", "init")
+	// get_memory agora devolve memory_entries (não mais o blob legado)
+	s.CreateMemoryEntry(&store.MemoryEntry{ProjectID: p.ID, Content: "use tabs", Category: "convencao"})
 	sk, _ := s.CreateSkill(p.ID, "Deploy", "# Objetivo\nfazer deploy\n## Passos\n1. build")
 
 	cs := connect(t, svc, "")

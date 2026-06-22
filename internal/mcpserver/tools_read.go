@@ -3,8 +3,11 @@ package mcpserver
 import (
 	"context"
 	"encoding/json"
+	"strings"
 
 	"github.com/modelcontextprotocol/go-sdk/mcp"
+
+	"github.com/eduardoworrel/worrel-agent-cockpit/internal/store"
 )
 
 type projectArg struct {
@@ -13,6 +16,16 @@ type projectArg struct {
 
 type skillArg struct {
 	SkillID string `json:"skill_id" jsonschema:"skill ID"`
+}
+
+type recallArg struct {
+	ProjectID string `json:"project_id,omitempty" jsonschema:"project ID; optional if the session is already bound to a project"`
+	Category  string `json:"category,omitempty" jsonschema:"opcional: filtra por categoria (convencao|arquitetura|gotcha|never_do|decisao)"`
+	Query     string `json:"query,omitempty" jsonschema:"opcional: filtra por termos contidos no conteúdo"`
+}
+
+type agentArg struct {
+	AgentID string `json:"agent_id" jsonschema:"agent ID"`
 }
 
 // jsonResult serializa v como JSON indentado; falha de marshal vira errResult.
@@ -49,20 +62,21 @@ func (svc *Service) addReadTools(srv *mcp.Server, a *attribution) {
 		})
 
 	mcp.AddTool(srv, &mcp.Tool{Name: "get_memory",
-		Description: "Loads the project memory (Markdown): conventions, decisions, learned corrections."},
-		func(ctx context.Context, req *mcp.CallToolRequest, in projectArg) (*mcp.CallToolResult, any, error) {
+		Description: "Recupera entradas de memória relevantes (golden truths anti-erro) do projeto, opcionalmente filtradas por categoria/consulta."},
+		func(ctx context.Context, req *mcp.CallToolRequest, in recallArg) (*mcp.CallToolResult, any, error) {
 			pid := a.resolveProject(in.ProjectID)
 			if pid == "" {
 				return errResult("project_id obrigatório (sessão sem projeto vinculado)"), nil, nil
 			}
-			m, err := svc.store.GetMemory(pid)
+			entries, err := svc.store.ListMemoryEntries(pid, false)
 			if err != nil {
 				return errResult(err.Error()), nil, nil
 			}
-			if m.Content == "" {
+			out := recallMemory(entries, in.Category, in.Query)
+			if len(out) == 0 {
 				return textResult("(memória vazia)"), nil, nil
 			}
-			return textResult(m.Content), nil, nil
+			return jsonResult(out)
 		})
 
 	mcp.AddTool(srv, &mcp.Tool{Name: "list_skills",
@@ -102,4 +116,41 @@ func (svc *Service) addReadTools(srv *mcp.Server, a *attribution) {
 			_, _ = svc.store.RecordSkillUsageStart(sk.ID, nilIfEmpty(sid), sk.ActiveGeneration)
 			return textResult(sk.Content), nil, nil
 		})
+
+	mcp.AddTool(srv, &mcp.Tool{Name: "load_agent",
+		Description: "Carrega a persona de um agente para a sessão atual. Aja conforme a persona (papel/expertise/regras)."},
+		func(ctx context.Context, req *mcp.CallToolRequest, in agentArg) (*mcp.CallToolResult, any, error) {
+			ag, err := svc.store.GetAgent(in.AgentID)
+			if err != nil {
+				return errResult("agente não encontrado"), nil, nil
+			}
+			return textResult(ag.Persona), nil, nil
+		})
+}
+
+// recallMemory filtra entradas ativas por categoria e/ou termos da query
+// (substring case-insensitive em qualquer termo). Sem filtros → todas.
+func recallMemory(entries []*store.MemoryEntry, category, query string) []map[string]string {
+	terms := strings.Fields(strings.ToLower(query))
+	out := []map[string]string{}
+	for _, e := range entries {
+		if category != "" && e.Category != category {
+			continue
+		}
+		if len(terms) > 0 {
+			lc := strings.ToLower(e.Content)
+			matched := false
+			for _, t := range terms {
+				if strings.Contains(lc, t) {
+					matched = true
+					break
+				}
+			}
+			if !matched {
+				continue
+			}
+		}
+		out = append(out, map[string]string{"category": e.Category, "content": e.Content})
+	}
+	return out
 }
