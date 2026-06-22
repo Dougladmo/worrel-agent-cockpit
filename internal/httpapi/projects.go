@@ -224,6 +224,22 @@ func (s *Server) routesProjects() {
 		}
 		writeJSON(w, 200, list)
 	})
+	s.mux.HandleFunc("GET /api/projects/{id}/agents", func(w http.ResponseWriter, r *http.Request) {
+		list, err := s.deps.Store.ListAgents(r.PathValue("id"))
+		if err != nil {
+			writeErr(w, 500, err.Error())
+			return
+		}
+		writeJSON(w, 200, list)
+	})
+	s.mux.HandleFunc("GET /api/projects/{id}/skill-candidates", func(w http.ResponseWriter, r *http.Request) {
+		list, err := s.deps.Store.ListSkillCandidates(r.PathValue("id"), "")
+		if err != nil {
+			writeErr(w, 500, err.Error())
+			return
+		}
+		writeJSON(w, 200, list)
+	})
 	s.mux.HandleFunc("GET /api/settings", func(w http.ResponseWriter, r *http.Request) {
 		writeJSON(w, 200, map[string]string{
 			"retention_days":   s.deps.Store.GetSetting("retention_days", "30"),

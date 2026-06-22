@@ -16,6 +16,7 @@ import (
 	"github.com/eduardoworrel/worrel-agent-cockpit/internal/adapter/claudecode"
 	"github.com/eduardoworrel/worrel-agent-cockpit/internal/engine"
 	"github.com/eduardoworrel/worrel-agent-cockpit/internal/engine/memory"
+	"github.com/eduardoworrel/worrel-agent-cockpit/internal/engine/skill"
 	"github.com/eduardoworrel/worrel-agent-cockpit/internal/adapter/codex"
 	"github.com/eduardoworrel/worrel-agent-cockpit/internal/adapter/gemini"
 	"github.com/eduardoworrel/worrel-agent-cockpit/internal/adapter/opencode"
@@ -143,6 +144,7 @@ func main() {
 
 	engines := engine.NewRegistry()
 	engines.Register(memory.New(cc))
+	engines.Register(skill.New(cc))
 
 	srv := httpapi.New(httpapi.Deps{
 		Store:     st,

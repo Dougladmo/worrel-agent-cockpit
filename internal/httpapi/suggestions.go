@@ -56,6 +56,14 @@ func (s *Server) routesSuggestions() {
 			writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 			return
 		}
+		if as := r.URL.Query().Get("as"); as != "" {
+			if err := s.deps.Applier.AcceptAs(id, as); err != nil {
+				writeErr(w, http.StatusInternalServerError, err.Error())
+				return
+			}
+			writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
+			return
+		}
 		if err := s.deps.Applier.Accept(id); err != nil {
 			if errors.Is(err, sql.ErrNoRows) {
 				writeErr(w, 404, "sugestão não encontrada")
