@@ -1,6 +1,7 @@
 package agui
 
 import (
+	"encoding/json"
 	"strings"
 
 	"github.com/eduardoworrel/worrel-agent-cockpit/internal/store"
@@ -19,10 +20,13 @@ func ProgressPrompt(events []*store.TranscriptEvent) string {
 		tail = tail[len(tail)-progressTailEvents:]
 	}
 	var b strings.Builder
-	b.WriteString("Você observa a sessão de um agente de programação. " +
-		"Resuma em ATÉ 3 linhas curtas, em português, o que está acontecendo agora: " +
-		"o que o agente fez e o que está fazendo. Uma frase simples por linha, " +
-		"sem markdown, sem numeração, sem aspas. Não invente — use só o transcript.\n\n" +
+	b.WriteString("Você observa a sessão de um agente de programação. Responda APENAS em " +
+		"JSON, sem texto extra:\n" +
+		"{\"title\":\"<2 a 4 palavras: o foco atual da sessão, vivo>\"," +
+		"\"lines\":[\"<frase curta do que está acontecendo>\"]}\n" +
+		"- title: rótulo curtíssimo (ex.: \"Ajustando o login\", \"Lendo o banco\"). Sem ponto final.\n" +
+		"- lines: ATÉ 3 frases simples do que o agente fez/está fazendo, em português.\n" +
+		"Não invente — use só o transcript.\n\n" +
 		"## Transcript (mais recente no fim)\n")
 	for _, e := range tail {
 		c := strings.TrimSpace(e.Content)
@@ -37,11 +41,36 @@ func ProgressPrompt(events []*store.TranscriptEvent) string {
 	return b.String()
 }
 
-// ParseProgress reduz a saída do LLM às linhas de progresso: tira marcação,
-// descarta vazios e limita a 3 linhas de até 120 chars.
-func ParseProgress(out string) []string {
+// ParseProgress extrai o título "vivo" e as linhas de progresso do JSON do LLM
+// (tolerante a cercas/lixo ao redor). Em falha, cai num parse linha-a-linha
+// (sem título), preservando robustez.
+func ParseProgress(out string) (title string, lines []string) {
+	if start := strings.IndexByte(out, '{'); start >= 0 {
+		if end := strings.LastIndexByte(out, '}'); end > start {
+			var raw struct {
+				Title string   `json:"title"`
+				Lines []string `json:"lines"`
+			}
+			if json.Unmarshal([]byte(out[start:end+1]), &raw) == nil && (raw.Title != "" || len(raw.Lines) > 0) {
+				return cleanTitle(raw.Title), cleanLines(raw.Lines)
+			}
+		}
+	}
+	// fallback: trata cada linha como progresso (sem título).
+	return "", cleanLines(strings.Split(out, "\n"))
+}
+
+func cleanTitle(t string) string {
+	t = strings.Trim(strings.TrimSpace(t), "\"'`.")
+	if len(t) > 48 {
+		t = t[:47] + "…"
+	}
+	return t
+}
+
+func cleanLines(in []string) []string {
 	var lines []string
-	for _, raw := range strings.Split(out, "\n") {
+	for _, raw := range in {
 		l := strings.TrimSpace(raw)
 		l = strings.TrimLeft(l, "-*•0123456789. ")
 		l = strings.Trim(l, "\"'`")

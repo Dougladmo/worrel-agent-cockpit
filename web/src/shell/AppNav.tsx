@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { NavLink } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { FanMark } from '../components/Fan';
-import { sessionName, ProviderBadge } from '../session';
+import { ProviderBadge } from '../session';
 import type { Project, Session } from '../api';
 
 interface Props {
@@ -26,12 +26,21 @@ export default function AppNav({ projects, sessions, liveIds, awaitingIds }: Pro
   const orphans = live.filter((s) => !s.project_id);
 
   function item(s: Session, isLive: boolean) {
+    const name = s.title?.trim() || t('terminals.untitled', 'Sessão');
+    const time = s.started_at
+      ? new Date(s.started_at).toLocaleTimeString(undefined, { hour: '2-digit', minute: '2-digit' })
+      : '';
     return (
       <NavLink key={s.id} to={`/sessions/${s.id}`}
         className={`appnav-term${awaitingIds.has(s.id) ? ' needs-attention' : ''}${isLive ? ' live' : ''}`}>
-        {isLive && <span className="appnav-live-dot" aria-hidden="true" />}
-        <span className="appnav-term-name">{sessionName(s)}</span>
-        <span className="appnav-term-badge"><ProviderBadge adapter={s.adapter} /></span>
+        <span className="appnav-term-top">
+          <ProviderBadge adapter={s.adapter} />
+        </span>
+        <span className="appnav-term-name">
+          {isLive && <span className="appnav-live-dot" aria-hidden="true" />}
+          {name}
+        </span>
+        <span className="appnav-term-time">{time}</span>
       </NavLink>
     );
   }

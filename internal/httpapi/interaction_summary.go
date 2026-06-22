@@ -75,6 +75,46 @@ func (c *progressCache) release(id string) {
 	delete(c.inflight, id)
 }
 
+// attachEngineTitle gera (via LLM, assíncrono e cacheado) um TÍTULO curto e vivo
+// para uma sessão do MOTOR a partir do histórico da conversa, e o grava como
+// nome da sessão (sidebar/card). O progresso do card já vem do próprio motor.
+func (s *Server) attachEngineTitle(snap *agui.Snapshot) {
+	if s.deps.Summarizer == nil || len(snap.History) < 2 {
+		return
+	}
+	id := snap.SessionID
+	if !s.titles.claim(id, len(snap.History)) {
+		return
+	}
+	atLen := len(snap.History)
+	prompt := agui.ProgressPrompt(historyToEvents(snap.History))
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), progressTimeout)
+		defer cancel()
+		out, err := s.deps.Summarizer.RunHeadless(ctx, prompt, adapter.HeadlessOpts{})
+		if err != nil {
+			s.titles.release(id)
+			return
+		}
+		title, _ := agui.ParseProgress(out)
+		s.titles.store(id, nil, atLen)
+		if title != "" {
+			_ = s.deps.Store.SetSessionTitle(id, title)
+			s.deps.Bus.Publish(bus.Event{Type: "session.titled", Payload: map[string]any{"id": id}})
+		}
+	}()
+}
+
+// historyToEvents converte o histórico AG-UI no formato de transcript que o
+// ProgressPrompt consome.
+func historyToEvents(h []agui.HistoryLine) []*store.TranscriptEvent {
+	out := make([]*store.TranscriptEvent, 0, len(h))
+	for _, l := range h {
+		out = append(out, &store.TranscriptEvent{Role: l.Role, Kind: "text", Content: l.Text})
+	}
+	return out
+}
+
 // attachProgress anexa as linhas de progresso em cache ao snapshot e, se o
 // transcript avançou, dispara uma regeneração assíncrona (não bloqueia o GET).
 // Ao concluir, publica interaction.changed para a Home rebuscar o snapshot.
@@ -99,12 +139,17 @@ func (s *Server) attachProgress(snap *agui.Snapshot, events []*store.TranscriptE
 			s.progress.release(id)
 			return
 		}
-		parsed := agui.ParseProgress(out)
-		if len(parsed) == 0 {
+		title, parsed := agui.ParseProgress(out)
+		if len(parsed) == 0 && title == "" {
 			s.progress.release(id)
 			return
 		}
 		s.progress.store(id, parsed, atLen)
+		// título "vivo": sobrescreve o nome da sessão e avisa a UI (sidebar/card).
+		if title != "" {
+			_ = s.deps.Store.SetSessionTitle(id, title)
+			s.deps.Bus.Publish(bus.Event{Type: "session.titled", Payload: map[string]any{"id": id}})
+		}
 		s.deps.Bus.Publish(bus.Event{Type: "interaction.changed", Payload: map[string]any{"session_id": id}})
 	}()
 }

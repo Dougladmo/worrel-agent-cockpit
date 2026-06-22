@@ -24,19 +24,30 @@ func TestProgressPrompt_UsesTailAndContent(t *testing.T) {
 	}
 }
 
-func TestParseProgress(t *testing.T) {
-	out := "- agente está lendo o db\n1. encontrou a senha\n\n\"e está fazendo o update\"\nlinha extra demais"
-	got := ParseProgress(out)
-	if len(got) != 3 {
-		t.Fatalf("esperava 3 linhas, veio %d: %#v", len(got), got)
+func TestParseProgress_JSON(t *testing.T) {
+	out := "```json\n{\"title\":\"Atualizando o DB\",\"lines\":[\"agente está lendo o db\",\"encontrou a senha\"]}\n```"
+	title, lines := ParseProgress(out)
+	if title != "Atualizando o DB" {
+		t.Fatalf("title = %q", title)
 	}
-	if got[0] != "agente está lendo o db" || got[1] != "encontrou a senha" || got[2] != "e está fazendo o update" {
-		t.Fatalf("limpeza errada: %#v", got)
+	if len(lines) != 2 || lines[0] != "agente está lendo o db" {
+		t.Fatalf("lines = %#v", lines)
+	}
+}
+
+func TestParseProgress_Fallback(t *testing.T) {
+	// sem JSON → cada linha vira progresso, sem título.
+	title, lines := ParseProgress("- agente está lendo o db\n1. encontrou a senha")
+	if title != "" {
+		t.Fatalf("título deveria ser vazio no fallback, veio %q", title)
+	}
+	if len(lines) != 2 || lines[0] != "agente está lendo o db" {
+		t.Fatalf("lines = %#v", lines)
 	}
 }
 
 func TestParseProgress_Empty(t *testing.T) {
-	if got := ParseProgress("\n  \n"); len(got) != 0 {
-		t.Fatalf("esperava vazio, veio %#v", got)
+	if title, lines := ParseProgress("\n  \n"); len(lines) != 0 || title != "" {
+		t.Fatalf("esperava vazio, veio title=%q lines=%#v", title, lines)
 	}
 }

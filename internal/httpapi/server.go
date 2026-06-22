@@ -40,11 +40,12 @@ type Server struct {
 	deps      Deps
 	mux       *http.ServeMux
 	progress  *progressCache  // cache do resumo por IA por sessão (canal AG-UI/Home)
+	titles    *progressCache  // cache do título "vivo" das sessões do motor
 	interpret *interpretCache // cache da interpretação de turnos-fala (auto-mode)
 }
 
 func New(deps Deps) *Server {
-	s := &Server{deps: deps, mux: http.NewServeMux(), progress: newProgressCache(), interpret: newInterpretCache()}
+	s := &Server{deps: deps, mux: http.NewServeMux(), progress: newProgressCache(), titles: newProgressCache(), interpret: newInterpretCache()}
 	s.routes()
 	return s
 }

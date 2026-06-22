@@ -264,6 +264,12 @@ func (s *Store) SetSessionTitleIfEmpty(id, title string) (bool, error) {
 	return n > 0, err
 }
 
+// SetSessionTitle sobrescreve o título da sessão (título "vivo" que evolui).
+func (s *Store) SetSessionTitle(id, title string) error {
+	_, err := s.db.Exec(`UPDATE sessions SET title=? WHERE id=?`, title, id)
+	return err
+}
+
 // SetSessionSummary grava o resumo estruturado de handoff.
 func (s *Store) SetSessionSummary(id, summary string) error {
 	_, err := s.db.Exec(`UPDATE sessions SET summary=? WHERE id=?`, summary, id)
