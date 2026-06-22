@@ -14,6 +14,7 @@ import NewSessionWizard from './components/NewSessionWizard';
 import EmptyState from './shell/EmptyState';
 import AppNav from './shell/AppNav';
 import Home from './pages/Home';
+import Dashboard from './pages/Dashboard';
 import SuggestionsDrawer from './shell/SuggestionsDrawer';
 import { useAppState } from './shell/useAppState';
 import type { Session } from './api';
@@ -217,7 +218,7 @@ function AppInner() {
 
   return (
     <div className="app-layout">
-      <AppNav projects={projects} sessions={wrapperSessions} liveIds={liveIds} awaitingIds={awaitingIds} />
+      <AppNav projects={projects} sessions={wrapperSessions} liveIds={liveIds} awaitingIds={awaitingIds} onChanged={reload} />
 
       <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
         <main style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
@@ -230,6 +231,7 @@ function AppInner() {
                 reloadKey={reloadKey}
               />
             } />
+            <Route path="/projects" element={<Dashboard onPendingCount={() => { /* badge gerido alhures */ }} />} />
             <Route path="/projects/:id" element={<Project />} />
             <Route path="/sessions/:id" element={<SessionRoute sessions={wrapperSessions} />} />
             <Route path="/settings" element={<Settings />} />

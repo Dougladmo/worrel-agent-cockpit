@@ -6,7 +6,9 @@
 package workspace
 
 import (
+	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 )
 
@@ -98,6 +100,27 @@ func (m *Manager) BrokenLinks(ws string) []string {
 		}
 	}
 	return out
+}
+
+// CloneRepo clona gitURL para <root>/repos/<slug> e devolve o caminho clonado.
+// Erro se a URL for vazia ou se o destino já existir não-vazio (evita sobrescrita).
+func (m *Manager) CloneRepo(slug, gitURL string) (string, error) {
+	if gitURL == "" {
+		return "", fmt.Errorf("git url vazia")
+	}
+	dest := filepath.Join(m.root, "repos", slug)
+	if entries, err := os.ReadDir(dest); err == nil && len(entries) > 0 {
+		return "", fmt.Errorf("destino já existe: %s", dest)
+	}
+	if err := os.MkdirAll(filepath.Dir(dest), 0o755); err != nil {
+		return "", err
+	}
+	cmd := exec.Command("git", "clone", "--", gitURL, dest)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		_ = os.RemoveAll(dest)
+		return "", fmt.Errorf("git clone falhou: %v: %s", err, out)
+	}
+	return dest, nil
 }
 
 // RemoveWorkspace apaga o workspace inteiro (usado ao deletar projeto/scratch).

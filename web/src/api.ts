@@ -135,10 +135,10 @@ export function listDirs(path?: string): Promise<DirListing> {
   return req(`/fs/dirs${qs}`);
 }
 
-export function createProject(name: string, description: string, dirs: string[]): Promise<Project> {
+export function createProject(name: string, description: string, dirs: string[], gitUrl?: string): Promise<Project> {
   return req('/projects', {
     method: 'POST',
-    body: JSON.stringify({ name, description, dirs }),
+    body: JSON.stringify({ name, description, dirs, git_url: gitUrl ?? '' }),
   });
 }
 

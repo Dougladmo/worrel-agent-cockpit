@@ -1491,13 +1491,51 @@ tr:last-child td { border-bottom: none; }
   padding: 6px 10px; background: var(--surface-warm);
   border-bottom: 1px solid var(--line);
 }
+/* Farol de estado da sessão na barra da miniatura. */
+.tcard-status {
+  width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0;
+  background: var(--muted); display: inline-block;
+}
+.tcard-status[data-state="working"] {
+  background: var(--green); box-shadow: 0 0 0 0 rgba(31, 157, 87, .5);
+  animation: tcard-status-pulse 1.4s ease-out infinite;
+}
+.tcard-status[data-state="awaiting"] { background: var(--amber); }
+.tcard-status[data-state="ended"] { background: var(--muted); opacity: .5; }
+@keyframes tcard-status-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(31, 157, 87, .5); }
+  70% { box-shadow: 0 0 0 5px rgba(31, 157, 87, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(31, 157, 87, 0); }
+}
 .tcard-dots { display: inline-flex; gap: 4px; }
 .tcard-dots i {
   width: 8px; height: 8px; border-radius: 50%;
   background: var(--line-strong); display: inline-block;
 }
-.tcard-mode { font-size: 0.72rem; color: var(--muted); }
-.tcard-titlebar .provider-badge { margin-left: auto; }
+.tcard-mode {
+  font-size: 0.72rem; color: var(--muted);
+  flex: 1; min-width: 0;
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+/* Switch de resumo por IA: ocupa o canto direito da barra (lugar antigo da badge). */
+.tcard-ai-switch {
+  margin-left: auto; flex-shrink: 0;
+  display: inline-flex; align-items: center; gap: 6px; cursor: pointer;
+}
+.tcard-ai-switch input { position: absolute; opacity: 0; width: 0; height: 0; }
+.tcard-ai-switch-track {
+  position: relative; width: 30px; height: 16px; border-radius: 999px;
+  background: var(--line-strong); transition: background .15s;
+}
+.tcard-ai-switch-thumb {
+  position: absolute; top: 2px; left: 2px; width: 12px; height: 12px;
+  border-radius: 50%; background: var(--surface); box-shadow: var(--shadow-sm);
+  transition: transform .15s;
+}
+.tcard-ai-switch input:checked + .tcard-ai-switch-track { background: var(--sky); }
+.tcard-ai-switch input:checked + .tcard-ai-switch-track .tcard-ai-switch-thumb { transform: translateX(14px); }
+.tcard-ai-switch input:focus-visible + .tcard-ai-switch-track { outline: 2px solid var(--sky); outline-offset: 2px; }
+.tcard-ai-switch-label { font-size: 0.68rem; font-weight: 600; color: var(--muted); }
 .tcard-body { padding: 14px 16px; flex: 1; }
 .tcard-heading {
   font-family: var(--display); font-weight: 700; color: var(--ink); margin-bottom: 8px;
@@ -1606,6 +1644,16 @@ tr:last-child td { border-bottom: none; }
 .nsw-project:hover .nsw-caret { color: var(--orange); transform: translateX(2px); }
 .nsw-project.on { background: var(--fill-amber); color: var(--ink); }
 .nsw-project.on .nsw-caret { color: var(--orange-ink); }
+.nsw-project-new { color: var(--muted); font-style: italic; }
+.nsw-project-new .nsw-caret { color: var(--orange); }
+
+/* NewProjectModal: alternância de fonte (pasta local / repositório git) */
+.np-source { display: flex; gap: 6px; margin-top: 6px; }
+.np-source-tab {
+  flex: 1; padding: 8px 10px; border: 1px solid var(--border); border-radius: 8px;
+  background: var(--surface); color: var(--muted); cursor: pointer; font-size: 0.875rem;
+}
+.np-source-tab.on { background: var(--fill-amber); color: var(--ink); border-color: var(--orange); }
 
 /* campo + modo (segmented com descrição) */
 .nsw-field-label {
@@ -1819,6 +1867,22 @@ tr:last-child td { border-bottom: none; }
   background: var(--amber); border-radius: 2px;
 }
 @media (prefers-reduced-motion: reduce) { .appnav-live-dot { animation: none; } }
+/* ações por estado: encerrar (vivas) / recomeçar + arquivar (encerradas).
+   Ficam escondidas e aparecem ao passar o mouse sobre o item da sidebar. */
+.appnav-term-wrap { position: relative; }
+.appnav-term-actions {
+  position: absolute; top: 4px; right: 6px; display: flex; gap: 2px;
+  opacity: 0; transition: opacity .12s ease; pointer-events: none;
+}
+.appnav-term-wrap:hover .appnav-term-actions,
+.appnav-term-actions:focus-within { opacity: 1; pointer-events: auto; }
+.appnav-term-act {
+  border: none; background: var(--surface); color: var(--muted); cursor: pointer;
+  font-size: 0.72rem; line-height: 1; padding: 2px 4px; border-radius: var(--r-sm);
+  box-shadow: 0 1px 2px rgba(0,0,0,0.12);
+}
+.appnav-term-act:hover { background: var(--surface-warm); color: var(--ink); }
+.appnav-term-act:disabled { opacity: .5; cursor: default; }
 
 /* SessionStream: transcript em linhas (você / IA / ferramenta / sistema) */
 .sstream-line { display: flex; gap: 10px; line-height: 1.45; max-width: 80ch; }
@@ -1848,8 +1912,19 @@ tr:last-child td { border-bottom: none; }
 /* dentro do shell, o painel ocupa tudo (sem borda própria) */
 .responder-modal .ixp, .responder-drawer .ixp { border: none; background: transparent; }
 
+/* Seções do painel: "Meu último pedido" / "Últimas ações" / "O que a IA espera de você". */
+.ixp-section { margin: 0 0 12px; }
+.ixp-section-title {
+  margin: 0 0 4px; font-size: 0.68rem; font-weight: 700; letter-spacing: .04em;
+  text-transform: uppercase; color: var(--muted);
+}
+.ixp-section-body { margin: 0; font-size: 0.9rem; line-height: 1.4; color: var(--ink); }
+/* A pergunta que a IA espera ganha um leve destaque (é o que você precisa responder). */
+.ixp-section-expects { border-left: 3px solid var(--sky); padding-left: 10px; }
+.ixp-section-expects .ixp-section-body { font-weight: 500; }
+
 /* contexto + última fala + opções no painel */
-.ixp-ctx-lines { list-style: none; margin: 0 0 8px; padding: 0; display: flex; flex-direction: column; gap: 3px; }
+.ixp-ctx-lines { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 3px; }
 .ixp-ctx { font-size: 0.78rem; color: var(--muted); padding-left: 10px; border-left: 2px solid var(--line); }
 .ixp-ctx.role-tool { font-family: var(--mono); }
 .ixp-said { font-size: 0.95rem; color: var(--ink); line-height: 1.4; margin: 4px 0 12px; font-weight: 500; }

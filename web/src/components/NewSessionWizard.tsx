@@ -5,6 +5,7 @@ import {
   createEngineSession, sendPrompt,
 } from '../api';
 import type { Project, DetectedAdapter, Skill, Agent, Session, PermissionMode } from '../api';
+import NewProjectModal from './NewProjectModal';
 
 interface Props {
   // openTerminal=true abre o terminal da sessão; false fica na Home (o terminal
@@ -52,6 +53,7 @@ export default function NewSessionWizard({ onCreated, onClose }: Props) {
   const [prompt, setPrompt] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [showNewProject, setShowNewProject] = useState(false);
 
   useEffect(() => {
     listProjects().then(setProjects).catch(() => setProjects([]));
@@ -163,6 +165,11 @@ export default function NewSessionWizard({ onCreated, onClose }: Props) {
                     </button>
                   </li>
                 ))}
+                <li>
+                  <button className="nsw-project nsw-project-new" onClick={() => setShowNewProject(true)}>
+                    <span className="nsw-caret">＋</span>{t('home.wizard.newProject')}
+                  </button>
+                </li>
               </ul>
 
               <div className="nsw-field">
@@ -241,6 +248,17 @@ export default function NewSessionWizard({ onCreated, onClose }: Props) {
           )}
         </div>
       </div>
+
+      {showNewProject && (
+        <NewProjectModal
+          onClose={() => setShowNewProject(false)}
+          onCreated={(proj) => {
+            setProjects((prev) => [proj, ...prev.filter((p) => p.id !== proj.id)]);
+            setShowNewProject(false);
+            pickProject(proj.id);
+          }}
+        />
+      )}
     </div>
   );
 }

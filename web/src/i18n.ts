@@ -29,6 +29,7 @@ i18next
             suggestions_other: 'suggestions',
             nav: {
               home: 'home',
+              projects: 'projects',
               metrics: 'metrics',
               joystick: 'joystick',
               lab: 'lab',
@@ -68,6 +69,9 @@ i18next
               working: 'Agent is working…',
               ended: 'Session ended.',
               state: { working: 'working', awaiting: 'your turn', ended: 'ended' },
+              myRequest: 'My last request',
+              lastActions: 'Latest actions',
+              expects: 'What the agent expects from you',
             },
           },
           terminals: {
@@ -418,6 +422,10 @@ i18next
             archive: 'Archive',
             archiveConfirmTitle: 'Archive session',
             archiveConfirmMsg: 'Are you sure you want to archive this session?',
+            end: 'End',
+            endHint: 'Ends this session’s agent process',
+            endConfirmTitle: 'End running session?',
+            endConfirmMsg: 'The agent process will be terminated. The session stays in history and can be resumed later.',
           },
           handoff: {
             banner: 'Start new session with handoff summary',
@@ -465,6 +473,10 @@ i18next
             dirs: 'Directories to link',
             create: 'Create',
             cancel: 'Cancel',
+            sourceLocal: 'Local folder',
+            sourceGit: 'Git repository',
+            gitUrl: 'Repository URL',
+            gitUrlPlaceholder: 'https://github.com/user/repo.git',
           },
           folderPicker: {
             home: 'Home',
@@ -558,6 +570,7 @@ i18next
             suggestions_other: 'sugestões',
             nav: {
               home: 'home',
+              projects: 'projetos',
               metrics: 'métricas',
               joystick: 'joystick',
               lab: 'lab',
@@ -597,6 +610,9 @@ i18next
               working: 'O agente está trabalhando…',
               ended: 'Sessão encerrada.',
               state: { working: 'trabalhando', awaiting: 'sua vez', ended: 'encerrada' },
+              myRequest: 'Meu último pedido',
+              lastActions: 'Últimas ações',
+              expects: 'O que a IA espera de você',
             },
           },
           terminals: {
@@ -947,6 +963,10 @@ i18next
             archive: 'Arquivar',
             archiveConfirmTitle: 'Arquivar sessão',
             archiveConfirmMsg: 'Tem certeza que deseja arquivar esta sessão?',
+            end: 'Encerrar',
+            endHint: 'Encerra o processo do agente desta sessão',
+            endConfirmTitle: 'Encerrar sessão em andamento?',
+            endConfirmMsg: 'O processo do agente será finalizado. A sessão fica no histórico e pode ser recomeçada depois.',
           },
           handoff: {
             banner: 'Iniciar nova sessão com resumo de handoff',
@@ -994,6 +1014,10 @@ i18next
             dirs: 'Pastas a linkar',
             create: 'Criar',
             cancel: 'Cancelar',
+            sourceLocal: 'Pasta local',
+            sourceGit: 'Repositório Git',
+            gitUrl: 'URL do repositório',
+            gitUrlPlaceholder: 'https://github.com/usuario/repo.git',
           },
           folderPicker: {
             home: 'Início',

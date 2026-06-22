@@ -30,6 +30,7 @@ func (s *Server) routesProjects() {
 			Name        string   `json:"name"`
 			Description string   `json:"description"`
 			Dirs        []string `json:"dirs"`
+			GitURL      string   `json:"git_url"`
 		}](r)
 		if err != nil || in.Name == "" {
 			writeErr(w, 400, "name obrigatório")
@@ -40,11 +41,27 @@ func (s *Server) routesProjects() {
 			writeErr(w, 500, err.Error())
 			return
 		}
-		for _, d := range in.Dirs {
+		dirs := append([]string{}, in.Dirs...)
+		// URL git: clona para <root>/repos/<slug> e adiciona o clone como pasta do projeto.
+		if in.GitURL != "" {
+			clonePath, cerr := s.deps.Workspace.CloneRepo(p.Slug, in.GitURL)
+			if cerr != nil {
+				_ = s.deps.Store.DeleteProject(p.ID)
+				writeErr(w, 400, cerr.Error())
+				return
+			}
+			dirs = append(dirs, clonePath)
+		}
+		for _, d := range dirs {
 			if err := s.deps.Store.AddProjectDir(p.ID, d); err != nil {
 				writeErr(w, 500, err.Error())
 				return
 			}
+		}
+		// Cria os symlinks do workspace já na criação (não só no spawn da sessão).
+		if _, err := s.deps.Workspace.SyncProject(p.Slug, dirs); err != nil {
+			writeErr(w, 500, err.Error())
+			return
 		}
 		p, err = s.deps.Store.GetProject(p.ID)
 		if err != nil {

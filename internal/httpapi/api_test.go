@@ -15,6 +15,7 @@ import (
 	"github.com/eduardoworrel/worrel-agent-cockpit/internal/bus"
 	"github.com/eduardoworrel/worrel-agent-cockpit/internal/mirror"
 	"github.com/eduardoworrel/worrel-agent-cockpit/internal/store"
+	"github.com/eduardoworrel/worrel-agent-cockpit/internal/workspace"
 )
 
 func newTestServer(t *testing.T) (*httptest.Server, *store.Store) {
@@ -25,7 +26,8 @@ func newTestServer(t *testing.T) (*httptest.Server, *store.Store) {
 	}
 	t.Cleanup(func() { s.Close() })
 	m := mirror.New(t.TempDir())
-	srv := New(Deps{Store: s, Mirror: m, Bus: bus.New(), Applier: apply.New(s, m, bus.New())})
+	srv := New(Deps{Store: s, Mirror: m, Bus: bus.New(), Applier: apply.New(s, m, bus.New()),
+		Workspace: workspace.New(t.TempDir())})
 	ts := httptest.NewServer(srv.Handler())
 	t.Cleanup(ts.Close)
 	return ts, s

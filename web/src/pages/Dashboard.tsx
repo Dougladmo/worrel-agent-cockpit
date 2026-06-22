@@ -1,16 +1,15 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import {
   listProjects,
-  createProject,
   listSuggestions,
   listSessions,
 } from '../api';
 import type { Project, Session } from '../api';
 import { sessionName, ProviderBadge } from '../session';
 import { FanHero } from '../components/Fan';
-import FolderPicker from '../components/FolderPicker';
+import NewProjectModal from '../components/NewProjectModal';
 
 interface Props {
   onPendingCount: (n: number) => void;
@@ -23,10 +22,7 @@ export default function Dashboard({ onPendingCount }: Props) {
   const [pendingMap, setPendingMap] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
-  const [form, setForm] = useState<{ name: string; description: string; dirs: string[] }>({ name: '', description: '', dirs: [] });
-  const nameInputRef = useRef<HTMLInputElement>(null);
   const [error, setError] = useState(false);
-  const [busy, setBusy] = useState(false);
   const [reloadKey, setReloadKey] = useState(0);
 
   useEffect(() => {
@@ -57,32 +53,6 @@ export default function Dashboard({ onPendingCount }: Props) {
     load();
     return () => { cancelled = true; };
   }, [reloadKey, onPendingCount]);
-
-  useEffect(() => {
-    if (!showModal) return;
-    nameInputRef.current?.focus();
-    function onKey(e: KeyboardEvent) {
-      if (e.key === 'Escape') setShowModal(false);
-    }
-    document.addEventListener('keydown', onKey);
-    return () => document.removeEventListener('keydown', onKey);
-  }, [showModal]);
-
-  async function handleCreate() {
-    if (!form.name || busy) return;
-    setBusy(true);
-    setError(false);
-    try {
-      await createProject(form.name, form.description, form.dirs);
-      setShowModal(false);
-      setForm({ name: '', description: '', dirs: [] });
-      setReloadKey((k) => k + 1);
-    } catch {
-      setError(true);
-    } finally {
-      setBusy(false);
-    }
-  }
 
   if (loading) return <div className="main"><p>{t('common.loading')}</p></div>;
 
@@ -147,37 +117,13 @@ export default function Dashboard({ onPendingCount }: Props) {
       )}
 
       {showModal && (
-        <div className="modal-overlay" onClick={() => setShowModal(false)}>
-          <div
-            className="modal"
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby="new-project-title"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <h2 id="new-project-title">{t('modal.newProject')}</h2>
-            <label htmlFor="np-name">{t('modal.name')}</label>
-            <input
-              ref={nameInputRef}
-              id="np-name"
-              value={form.name}
-              onChange={(e) => setForm({ ...form, name: e.target.value })}
-            />
-            <label htmlFor="np-description" style={{ marginTop: '0.75rem' }}>{t('modal.description')}</label>
-            <input
-              id="np-description"
-              value={form.description}
-              onChange={(e) => setForm({ ...form, description: e.target.value })}
-            />
-            <label style={{ marginTop: '0.75rem', display: 'block' }}>{t('modal.dirs')}</label>
-            <FolderPicker value={form.dirs} onChange={(dirs) => setForm({ ...form, dirs })} />
-            {error && <p className="error-banner">{t('common.actionFailed')}</p>}
-            <div style={{ display: 'flex', gap: '0.5rem', marginTop: '1rem' }}>
-              <button className="btn btn-primary" disabled={busy} onClick={handleCreate}>{t('modal.create')}</button>
-              <button className="btn btn-secondary" onClick={() => setShowModal(false)}>{t('modal.cancel')}</button>
-            </div>
-          </div>
-        </div>
+        <NewProjectModal
+          onClose={() => setShowModal(false)}
+          onCreated={() => {
+            setShowModal(false);
+            setReloadKey((k) => k + 1);
+          }}
+        />
       )}
     </div>
   );
