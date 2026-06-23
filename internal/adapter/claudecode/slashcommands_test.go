@@ -80,8 +80,8 @@ func TestListSlashCommands_MergesUserAndProject(t *testing.T) {
 		t.Fatalf("esperava /ship de project, got %+v", triggers)
 	}
 	// Built-ins do CLI (hardcoded) devem aparecer junto com os de arquivo.
-	if triggers["/compact"] != "builtin" || triggers["/mcp"] != "builtin" {
-		t.Fatalf("esperava built-ins /compact e /mcp, got %+v", triggers)
+	if triggers["/compact"] != "builtin" || triggers["/init"] != "builtin" {
+		t.Fatalf("esperava built-ins /compact e /init, got %+v", triggers)
 	}
 }
 
@@ -108,4 +108,177 @@ func TestListSlashCommands_UserOverridesBuiltin(t *testing.T) {
 type adapterSlash struct {
 	desc   string
 	source string
+}
+
+// setupPlugin cria a árvore de um plugin instalado: o arquivo de comando e a
+// entrada em installed_plugins.json. Devolve o installPath.
+func setupPlugin(t *testing.T, claudeDir, name, cmdFile string) string {
+	t.Helper()
+	installPath := filepath.Join(claudeDir, "plugins", "cache", name)
+	writeCmd(t, filepath.Join(installPath, "commands", cmdFile), "comando do plugin")
+	return installPath
+}
+
+func writeInstalledPlugins(t *testing.T, claudeDir, body string) {
+	t.Helper()
+	path := filepath.Join(claudeDir, "plugins", "installed_plugins.json")
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestPluginSlashCommands_UserEnabledAndLocalScope(t *testing.T) {
+	claudeDir := t.TempDir()
+	projectDir := t.TempDir()
+
+	userPath := setupPlugin(t, claudeDir, "speckit", "speckit-specify.md")
+	localPath := setupPlugin(t, claudeDir, "pinecone", "join-discord.md")
+	disabledPath := setupPlugin(t, claudeDir, "dormant", "nope.md")
+
+	writeInstalledPlugins(t, claudeDir, `{"plugins":{
+		"speckit@mkt":[{"scope":"user","installPath":"`+userPath+`"}],
+		"pinecone@mkt":[{"scope":"local","projectPath":"`+projectDir+`","installPath":"`+localPath+`"}],
+		"dormant@mkt":[{"scope":"user","installPath":"`+disabledPath+`"}]
+	}}`)
+	if err := os.WriteFile(filepath.Join(claudeDir, "settings.json"),
+		[]byte(`{"enabledPlugins":{"speckit@mkt":true,"dormant@mkt":false}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	a := &Adapter{userClaudeDir: claudeDir}
+	cmds, err := a.ListSlashCommands(context.Background(), projectDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := map[string]string{}
+	for _, c := range cmds {
+		got[c.Trigger] = c.Source
+	}
+	if got["/speckit:speckit-specify"] != "plugin" {
+		t.Fatalf("esperava /speckit:speckit-specify (user habilitado), got %+v", got)
+	}
+	if got["/pinecone:join-discord"] != "plugin" {
+		t.Fatalf("esperava /pinecone:join-discord (local no projeto), got %+v", got)
+	}
+	if _, ok := got["/dormant:nope"]; ok {
+		t.Fatalf("plugin desabilitado não deveria aparecer, got %+v", got)
+	}
+}
+
+// writeSkill cria <skillsDir>/<dir>/SKILL.md com frontmatter name/description.
+func writeSkill(t *testing.T, skillsDir, dir, name, description string) {
+	t.Helper()
+	path := filepath.Join(skillsDir, dir, "SKILL.md")
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	body := "---\nname: \"" + name + "\"\ndescription: \"" + description + "\"\n---\ncorpo"
+	if err := os.WriteFile(path, []byte(body), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestListSlashCommands_DiscoversProjectAndPluginSkills(t *testing.T) {
+	claudeDir := t.TempDir()
+	projectDir := t.TempDir()
+
+	// Skill de projeto (cenário spec-kit): /speckit-specify, sem namespace.
+	writeSkill(t, filepath.Join(projectDir, ".claude", "skills"), "speckit-specify",
+		"speckit-specify", "Cria a especificação da feature")
+
+	// Skill de plugin habilitado (user): vira /<plugin>:<nome>.
+	pluginPath := filepath.Join(claudeDir, "plugins", "cache", "superpowers")
+	writeSkill(t, filepath.Join(pluginPath, "skills"), "tdd", "test-driven-development", "TDD")
+	writeInstalledPlugins(t, claudeDir, `{"plugins":{
+		"superpowers@mkt":[{"scope":"user","installPath":"`+pluginPath+`"}]
+	}}`)
+	if err := os.WriteFile(filepath.Join(claudeDir, "settings.json"),
+		[]byte(`{"enabledPlugins":{"superpowers@mkt":true}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	a := &Adapter{userClaudeDir: claudeDir}
+	cmds, err := a.ListSlashCommands(context.Background(), projectDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := map[string]string{}
+	for _, c := range cmds {
+		got[c.Trigger] = c.Source
+	}
+	if got["/speckit-specify"] != "project" {
+		t.Fatalf("esperava /speckit-specify (skill de projeto), got %+v", got)
+	}
+	if got["/superpowers:test-driven-development"] != "plugin" {
+		t.Fatalf("esperava /superpowers:test-driven-development (skill de plugin), got %+v", got)
+	}
+}
+
+func TestPluginSkills_PreNamespacedNameNotDuplicated(t *testing.T) {
+	claudeDir := t.TempDir()
+	pluginPath := filepath.Join(claudeDir, "plugins", "cache", "pinecone")
+	// Skill cujo name já vem namespaced (ex.: pinecone) não deve virar
+	// /pinecone:pinecone:assistant — o CLI invoca /pinecone:assistant.
+	writeSkill(t, filepath.Join(pluginPath, "skills"), "assistant", "pinecone:assistant", "Assistant")
+	writeInstalledPlugins(t, claudeDir, `{"plugins":{
+		"pinecone@mkt":[{"scope":"user","installPath":"`+pluginPath+`"}]
+	}}`)
+	if err := os.WriteFile(filepath.Join(claudeDir, "settings.json"),
+		[]byte(`{"enabledPlugins":{"pinecone@mkt":true}}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+
+	a := &Adapter{userClaudeDir: claudeDir}
+	cmds, err := a.ListSlashCommands(context.Background(), "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := map[string]bool{}
+	for _, c := range cmds {
+		got[c.Trigger] = true
+	}
+	if !got["/pinecone:assistant"] {
+		t.Fatalf("esperava /pinecone:assistant, got %+v", got)
+	}
+	if got["/pinecone:pinecone:assistant"] {
+		t.Fatalf("não deveria duplicar o namespace (/pinecone:pinecone:assistant)")
+	}
+}
+
+func TestScanClaudeSkills_SkipsDirsWithoutSkillFile(t *testing.T) {
+	skillsDir := t.TempDir()
+	if err := os.MkdirAll(filepath.Join(skillsDir, "vazio"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	writeSkill(t, skillsDir, "real", "real-skill", "ok")
+	got := scanClaudeSkills(skillsDir, "", "user")
+	if len(got) != 1 || got[0].Trigger != "/real-skill" {
+		t.Fatalf("esperava só /real-skill, got %+v", got)
+	}
+}
+
+func TestPluginSlashCommands_LocalScopeOutsideProjectHidden(t *testing.T) {
+	claudeDir := t.TempDir()
+	projectDir := t.TempDir()
+	otherDir := t.TempDir()
+
+	localPath := setupPlugin(t, claudeDir, "pinecone", "join-discord.md")
+	writeInstalledPlugins(t, claudeDir, `{"plugins":{
+		"pinecone@mkt":[{"scope":"local","projectPath":"`+projectDir+`","installPath":"`+localPath+`"}]
+	}}`)
+
+	a := &Adapter{userClaudeDir: claudeDir}
+	// Sessão rodando em OUTRO diretório: o plugin local não deve aparecer.
+	cmds, err := a.ListSlashCommands(context.Background(), otherDir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, c := range cmds {
+		if c.Trigger == "/pinecone:join-discord" {
+			t.Fatalf("plugin local não deveria aparecer fora do seu projeto")
+		}
+	}
 }
