@@ -27,9 +27,9 @@ import (
 
 // Session é um processo claude stream-json vivo, com seu estado de interação.
 type Session struct {
-	id    string
-	cmd   *exec.Cmd
-	stdin *json.Encoder
+	id     string
+	cmd    *exec.Cmd
+	stdin  *json.Encoder
 	stdinW interface{ Close() error }
 
 	// onChange é chamado a cada mudança de estado (a Home rebusca o Snapshot).
@@ -38,15 +38,15 @@ type Session struct {
 	// sobreviva ao restart do app. Pode ser nil (sessão efêmera).
 	persist func(role, text string)
 
-	mu        sync.Mutex
-	message   string          // última fala do assistant
-	progress  []string        // falas recentes (timeline do card)
-	toolCalls []agui.ToolCall // tool_use do turno atual
+	mu          sync.Mutex
+	message     string          // última fala do assistant
+	progress    []string        // falas recentes (timeline do card)
+	toolCalls   []agui.ToolCall // tool_use do turno atual
 	state       agui.State
-	interrupt   *agui.Interrupt // can_use_tool pendente, ou nil
-	reqID       any             // request_id do can_use_tool em aberto
-	pendingIn   any             // input da ferramenta pendente (exigido no allow)
-	pendingTool string          // nome da ferramenta pendente (p/ o log da decisão)
+	interrupt   *agui.Interrupt    // can_use_tool pendente, ou nil
+	reqID       any                // request_id do can_use_tool em aberto
+	pendingIn   any                // input da ferramenta pendente (exigido no allow)
+	pendingTool string             // nome da ferramenta pendente (p/ o log da decisão)
 	history     []agui.HistoryLine // transcript completo da conversa
 }
 
@@ -305,20 +305,31 @@ func (s *Session) handle(ev map[string]any) {
 func (s *Session) handleAssistant(ev map[string]any) {
 	msg, _ := ev["message"].(map[string]any)
 	content, _ := msg["content"].([]any)
+	// Saída de slash command local (/usage, /context…) volta como assistant de
+	// model "<synthetic>" e zero tokens — não é fala do agente. Marcamos como
+	// "command" para a UI enquadrar num card, e não a tomamos como última fala.
+	isCommandOutput := asString(msg["model"]) == "<synthetic>"
 	var added []agui.HistoryLine
 	s.mu.Lock()
 	for _, b := range content {
 		bm, _ := b.(map[string]any)
 		switch bm["type"] {
 		case "text":
-			if t := strings.TrimSpace(asString(bm["text"])); t != "" {
-				s.message = t
+			t := strings.TrimSpace(asString(bm["text"]))
+			if t == "" {
+				continue
+			}
+			role := "ai"
+			if isCommandOutput {
+				role = "command"
+			} else {
 				// NÃO vira progress: o card mostra EVENTOS NARRADOS (gerados pelo
 				// summarizer), não as mensagens cruas. Aqui só guardamos o histórico.
-				line := agui.HistoryLine{Role: "ai", Text: t}
-				s.history = append(s.history, line)
-				added = append(added, line)
+				s.message = t
 			}
+			line := agui.HistoryLine{Role: role, Text: t}
+			s.history = append(s.history, line)
+			added = append(added, line)
 		case "tool_use":
 			name := asString(bm["name"])
 			sum := summarizeInput(bm["input"])
@@ -418,4 +429,3 @@ func summarizeInput(v any) string {
 	}
 	return str
 }
-
