@@ -2031,6 +2031,39 @@ tr:last-child td { border-bottom: none; }
 .chat-system { text-align: center; font-size: 0.76rem; color: var(--orange-ink); }
 .chat-thinking { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 0.85rem; padding-left: 4px; }
 
+/* painel de saída de slash command local (/usage, /context…) — sem header.
+   Sem overflow:hidden: num flex-column ele zeraria o min-height do card e o
+   flexbox o encolheria, cortando o conteúdo. Cresce com o conteúdo; o body rola. */
+.chat-command { border: 1px solid var(--line); border-radius: var(--r-sm); background: var(--surface-sunk); }
+.chat-command-body { padding: 12px 14px; font-size: 0.85rem; min-width: 0; }
+.chat-command-body.chat-md { overflow-x: auto; }
+
+/* relatório estruturado (usage/config): linhas tipadas */
+.cmd-report { display: flex; flex-direction: column; }
+.cmd-gap { height: 10px; }
+.cmd-lead { margin: 0 0 2px; color: var(--ink); font-weight: 600; }
+.cmd-section { margin: 0 0 5px; font-family: var(--mono); font-size: 0.67rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }
+.cmd-text { margin: 0; color: var(--ink); line-height: 1.5; }
+.cmd-stat { margin: 0; color: var(--ink); line-height: 1.5; }
+.cmd-stat b { color: var(--orange-ink); font-weight: 700; font-variant-numeric: tabular-nums; }
+
+/* medidor de quota (/usage) — barra sky no track creme */
+.cmd-meter { margin: 1px 0 7px; }
+.cmd-meter-top { display: flex; justify-content: space-between; align-items: baseline; gap: 12px; margin-bottom: 4px; }
+.cmd-meter-label { color: var(--ink); font-weight: 600; }
+.cmd-meter-pct { font-family: var(--mono); font-size: 0.78rem; color: var(--sky); white-space: nowrap; font-variant-numeric: tabular-nums; }
+.cmd-meter-track { height: 6px; border-radius: 999px; background: var(--surface-warm); overflow: hidden; }
+.cmd-meter-fill { height: 100%; border-radius: 999px; background: var(--sky); transition: width 0.3s ease; }
+.cmd-meter-meta { margin-top: 4px; font-size: 0.74rem; color: var(--muted); }
+
+/* pares key=value (/config) — grid que alinha as chaves */
+.cmd-kv-grid {
+  display: grid; grid-template-columns: minmax(0, max-content) 1fr; gap: 3px 18px;
+  align-items: baseline; padding: 2px 0;
+}
+.cmd-kv-key { font-family: var(--mono); font-size: 0.79rem; color: var(--ink); }
+.cmd-kv-val { font-family: var(--mono); font-size: 0.79rem; color: var(--muted); word-break: break-word; }
+
 /* markdown dentro da bolha da IA */
 .chat-md > :first-child { margin-top: 0; }
 .chat-md > :last-child { margin-bottom: 0; }

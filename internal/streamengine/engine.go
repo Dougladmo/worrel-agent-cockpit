@@ -266,20 +266,31 @@ func (s *Session) handle(ev map[string]any) {
 func (s *Session) handleAssistant(ev map[string]any) {
 	msg, _ := ev["message"].(map[string]any)
 	content, _ := msg["content"].([]any)
+	// Saída de slash command local (/usage, /context…) volta como assistant de
+	// model "<synthetic>" e zero tokens — não é fala do agente. Marcamos como
+	// "command" para a UI enquadrar num card, e não a tomamos como última fala.
+	isCommandOutput := asString(msg["model"]) == "<synthetic>"
 	var added []agui.HistoryLine
 	s.mu.Lock()
 	for _, b := range content {
 		bm, _ := b.(map[string]any)
 		switch bm["type"] {
 		case "text":
-			if t := strings.TrimSpace(asString(bm["text"])); t != "" {
-				s.message = t
+			t := strings.TrimSpace(asString(bm["text"]))
+			if t == "" {
+				continue
+			}
+			role := "ai"
+			if isCommandOutput {
+				role = "command"
+			} else {
 				// NÃO vira progress: o card mostra EVENTOS NARRADOS (gerados pelo
 				// summarizer), não as mensagens cruas. Aqui só guardamos o histórico.
-				line := agui.HistoryLine{Role: "ai", Text: t}
-				s.history = append(s.history, line)
-				added = append(added, line)
+				s.message = t
 			}
+			line := agui.HistoryLine{Role: role, Text: t}
+			s.history = append(s.history, line)
+			added = append(added, line)
 		case "tool_use":
 			name := asString(bm["name"])
 			sum := summarizeInput(bm["input"])

@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import ReactMarkdown from 'react-markdown';
@@ -224,9 +224,15 @@ export default function SessionStream() {
   );
 }
 
+// A saída de comandos locais (/usage) usa quebras de linha simples, que o markdown
+// colapsa num parágrafo só. Convertê-las em hard breaks preserva as linhas sem
+// afetar tabelas (ex.: /context já vem como tabela markdown).
+const withHardBreaks = (text: string) => text.replace(/\n/g, '  \n');
+
 // ChatLine renderiza uma linha do histórico como uma bolha de chat:
 //   you → bolha do usuário (direita); ai → markdown renderizado (esquerda);
-//   tool → linha discreta (mono); system → nota central.
+//   tool → linha discreta (mono); system → nota central;
+//   command → painel com a saída formatada de um slash command (/usage, /context…).
 function ChatLine({ line }: { line: HistoryLine }) {
   if (line.role === 'tool') {
     return <div className="chat-tool"><code>{line.text}</code></div>;
@@ -237,6 +243,9 @@ function ChatLine({ line }: { line: HistoryLine }) {
   if (line.role === 'you') {
     return <div className="chat-row chat-you"><div className="chat-bubble">{line.text}</div></div>;
   }
+  if (line.role === 'command') {
+    return <div className="chat-command"><CommandOutput text={line.text} /></div>;
+  }
   // ai → markdown
   return (
     <div className="chat-row chat-ai">
@@ -245,4 +254,88 @@ function ChatLine({ line }: { line: HistoryLine }) {
       </div>
     </div>
   );
+}
+
+// Comandos como /context já voltam em markdown (tabelas, headings); os de dados
+// crus (/usage, /config) são texto plano e ganham estrutura própria.
+const looksLikeMarkdown = (text: string) =>
+  /\|\s*:?-{3,}/.test(text) || /^#{1,6}\s/m.test(text) || /\*\*[^*\n]+\*\*/.test(text);
+
+type CmdRow =
+  | { kind: 'gap' }
+  | { kind: 'lead'; text: string }
+  | { kind: 'section'; text: string }
+  | { kind: 'meter'; label: string; pct: number; meta?: string }
+  | { kind: 'kv'; key: string; value: string }
+  | { kind: 'stat'; pct: string; text: string }
+  | { kind: 'text'; text: string };
+
+// classifyCommandOutput estrutura a saída de dados linha a linha por padrão (não
+// por comando): "N% used" vira medidor, "key=value" vira par, e o resto cai em
+// texto — então comandos desconhecidos degradam para linhas limpas, sem quebrar.
+function classifyCommandOutput(text: string): CmdRow[] {
+  const rows: CmdRow[] = [];
+  text.split('\n').forEach((raw, i) => {
+    const line = raw.trim();
+    if (!line) {
+      if (rows.length && rows[rows.length - 1].kind !== 'gap') rows.push({ kind: 'gap' });
+      return;
+    }
+    const meter = line.match(/^(.*?):\s*(\d+)%\s+used(?:\s*·\s*(.*))?$/);
+    if (meter) { rows.push({ kind: 'meter', label: meter[1].trim(), pct: +meter[2], meta: meter[3]?.trim() }); return; }
+    const kv = line.match(/^([A-Za-z0-9_]+)=(.+)$/);
+    if (kv) { rows.push({ kind: 'kv', key: kv[1], value: kv[2] }); return; }
+    if (i === 0) { rows.push({ kind: 'lead', text: line }); return; }
+    if (line.endsWith('?') || /^Last \d/.test(line)) { rows.push({ kind: 'section', text: line.replace(/\?$/, '') }); return; }
+    const stat = line.match(/^(\d+)%\s+(.+)$/);
+    if (stat) { rows.push({ kind: 'stat', pct: stat[1], text: stat[2] }); return; }
+    rows.push({ kind: 'text', text: line });
+  });
+  return rows;
+}
+
+const spacedOptions = (value: string) => value.replace(/\|/g, ' | ');
+
+function CommandOutput({ text }: { text: string }) {
+  if (looksLikeMarkdown(text)) {
+    return (
+      <div className="chat-command-body chat-md">
+        <ReactMarkdown remarkPlugins={[remarkGfm]}>{withHardBreaks(text)}</ReactMarkdown>
+      </div>
+    );
+  }
+  const rows = classifyCommandOutput(text);
+  const blocks: ReactNode[] = [];
+  for (let i = 0; i < rows.length; ) {
+    // Agrupa key=value consecutivos num grid único para alinhar as chaves.
+    if (rows[i].kind === 'kv') {
+      const pairs: { key: string; value: string }[] = [];
+      while (i < rows.length && rows[i].kind === 'kv') { pairs.push(rows[i] as { key: string; value: string }); i++; }
+      blocks.push(
+        <div className="cmd-kv-grid" key={`kv${i}`}>
+          {pairs.flatMap((p, k) => [
+            <span key={`k${k}`} className="cmd-kv-key">{p.key}</span>,
+            <span key={`v${k}`} className="cmd-kv-val">{spacedOptions(p.value)}</span>,
+          ])}
+        </div>,
+      );
+      continue;
+    }
+    const r = rows[i];
+    const key = `r${i}`;
+    if (r.kind === 'gap') blocks.push(<div className="cmd-gap" key={key} />);
+    else if (r.kind === 'lead') blocks.push(<p className="cmd-lead" key={key}>{r.text}</p>);
+    else if (r.kind === 'section') blocks.push(<p className="cmd-section" key={key}>{r.text}</p>);
+    else if (r.kind === 'stat') blocks.push(<p className="cmd-stat" key={key}><b>{r.pct}%</b> {r.text}</p>);
+    else if (r.kind === 'meter') blocks.push(
+      <div className="cmd-meter" key={key}>
+        <div className="cmd-meter-top"><span className="cmd-meter-label">{r.label}</span><span className="cmd-meter-pct">{r.pct}% used</span></div>
+        <div className="cmd-meter-track"><div className="cmd-meter-fill" style={{ width: `${Math.min(r.pct, 100)}%` }} /></div>
+        {r.meta && <div className="cmd-meter-meta">{r.meta}</div>}
+      </div>,
+    );
+    else if (r.kind === 'text') blocks.push(<p className="cmd-text" key={key}>{r.text}</p>);
+    i++;
+  }
+  return <div className="chat-command-body cmd-report">{blocks}</div>;
 }

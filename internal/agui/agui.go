@@ -48,7 +48,7 @@ type Interrupt struct {
 
 // HistoryLine é uma linha do transcript da sessão (visão de conversa).
 type HistoryLine struct {
-	Role string `json:"role"` // you | ai | tool | system
+	Role string `json:"role"` // you | ai | tool | system | command
 	Text string `json:"text"`
 }
 

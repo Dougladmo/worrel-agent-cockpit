@@ -531,7 +531,7 @@ export interface ToolCall {
 }
 
 export interface HistoryLine {
-  role: 'you' | 'ai' | 'tool' | 'system';
+  role: 'you' | 'ai' | 'tool' | 'system' | 'command';
   text: string;
 }
 
