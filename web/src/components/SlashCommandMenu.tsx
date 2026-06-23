@@ -1,10 +1,8 @@
-// SlashCommandMenu: popover de autocomplete acionado por "/" no campo de prompt.
-// Une três fontes — comandos "/" nativos do CLI, skills e agents do worrel — numa
-// lista filtrável. É puramente apresentacional: o estado (abertura, item ativo,
-// query) vive no componente pai; aqui só renderizamos a lista já filtrada e
-// avisamos seleção/hover. Selecionar INSERE o texto no input (o usuário revisa e
-// envia), espelhando o comportamento do Claude Code.
+// SlashCommandMenu: popover de autocomplete do "/" no composer. Apresentacional —
+// estado (abertura, item ativo, query) vive no pai; selecionar insere o texto no
+// input, como no Claude Code.
 
+import { useEffect, useRef } from 'react';
 import type { SlashItem, SlashKind } from './slashCommands';
 
 const KIND_TAG: Record<SlashKind, string> = {
@@ -14,26 +12,40 @@ const KIND_TAG: Record<SlashKind, string> = {
 };
 
 interface Props {
-  items: SlashItem[]; // já filtrados pelo pai
-  activeIndex: number;
+  items: SlashItem[];
+  activeIndex: number; // seleção do teclado; o hover é só visual (CSS :hover)
   onSelect: (item: SlashItem) => void;
-  onHover: (index: number) => void;
 }
 
-export default function SlashCommandMenu({ items, activeIndex, onSelect, onHover }: Props) {
+export default function SlashCommandMenu({ items, activeIndex, onSelect }: Props) {
+  const menuRef = useRef<HTMLDivElement>(null);
+  const activeRef = useRef<HTMLButtonElement>(null);
+
+  // Mantém o item ativo visível rolando só o container — scrollIntoView poderia
+  // rolar a página. offsetTop é relativo ao .slash-menu (offsetParent).
+  useEffect(() => {
+    const menu = menuRef.current;
+    const item = activeRef.current;
+    if (!menu || !item) return;
+    const top = item.offsetTop;
+    const bottom = top + item.offsetHeight;
+    if (top < menu.scrollTop) menu.scrollTop = top;
+    else if (bottom > menu.scrollTop + menu.clientHeight) menu.scrollTop = bottom - menu.clientHeight;
+  }, [activeIndex]);
+
   if (items.length === 0) return null;
   return (
-    <div className="slash-menu" role="listbox">
+    <div className="slash-menu" role="listbox" ref={menuRef}>
       {items.map((it, i) => (
         <button
           key={it.label}
+          ref={i === activeIndex ? activeRef : null}
           type="button"
           role="option"
           aria-selected={i === activeIndex}
           className={`slash-item${i === activeIndex ? ' is-active' : ''}`}
-          // onMouseDown (não onClick) para selecionar antes do textarea perder foco/blur.
+          // onMouseDown (não onClick) seleciona antes do textarea sofrer blur.
           onMouseDown={(e) => { e.preventDefault(); onSelect(it); }}
-          onMouseEnter={() => onHover(i)}
         >
           <span className="slash-item-main">
             <span className="slash-item-label">{it.label}</span>

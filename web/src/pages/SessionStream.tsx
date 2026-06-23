@@ -204,7 +204,6 @@ export default function SessionStream() {
               items={filtered}
               activeIndex={activeIndex}
               onSelect={selectSlashItem}
-              onHover={setActiveIndex}
             />
           )}
           <span className="nsw-prompt-glyph" aria-hidden="true">›</span>

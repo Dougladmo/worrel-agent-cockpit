@@ -1836,7 +1836,10 @@ tr:last-child td { border-bottom: none; }
   width: 100%; text-align: left; background: none; border: none; border-radius: 6px;
   padding: 7px 10px; cursor: pointer; color: var(--ink);
 }
-.slash-item:hover, .slash-item.is-active { background: var(--surface-warm); }
+.slash-item:hover { background: var(--surface-warm); }
+/* Item selecionado pelo teclado: destaque AZUL, distinto do hover (quente). */
+.slash-item.is-active { background: var(--fill-sky); box-shadow: inset 2px 0 0 var(--sky); }
+.slash-item.is-active .slash-item-label { color: var(--sky); }
 .slash-item-main { display: flex; flex-direction: column; gap: 1px; min-width: 0; }
 .slash-item-label { font-family: var(--mono); font-size: 0.86rem; color: var(--ink); }
 .slash-item-desc {
