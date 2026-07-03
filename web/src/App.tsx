@@ -16,6 +16,7 @@ import AppNav from './shell/AppNav';
 import Home from './pages/Home';
 import Dashboard from './pages/Dashboard';
 import SuggestionsDrawer from './shell/SuggestionsDrawer';
+import EngineHealthBanner from './components/EngineHealthBanner';
 import { useAppState } from './shell/useAppState';
 import { useSnapshots } from './useSnapshots';
 import { sessionStatus } from './sessionStatus';
@@ -48,6 +49,10 @@ function AppInner() {
   // queue = sessões que entraram em "awaiting" e aguardam a vez; deferredSet =
   // sessões adiadas (não auto-abrem). Edge-triggered: só enfileira no evento.
   const [openSessionId, setOpenSessionId] = useState<string | null>(null);
+  // openAuto = o modal atual foi aberto pela FILA (pergunta pendente / bolinha),
+  // não por clique explícito num card. Só o auto-aberto se autofecha quando a
+  // interação se resolve (evita modal preso em "nenhuma ação pendente").
+  const [openAuto, setOpenAuto] = useState(false);
   const [modalQueue, setModalQueue] = useState<string[]>([]);
   const deferredRef = useRef<Set<string>>(new Set());
   // Sessões já conhecidas como "aguardando", p/ disparar a auto-abertura só na
@@ -201,6 +206,7 @@ function AppInner() {
   useEffect(() => {
     if (openSessionId || modalQueue.length === 0) return;
     setOpenSessionId(modalQueue[0]);
+    setOpenAuto(true);
     setModalQueue((q) => q.slice(1));
   }, [openSessionId, modalQueue]);
 
@@ -303,7 +309,7 @@ function AppInner() {
           <SecretApprovalModal requestId={approval.requestId} secretName={approval.secretName} onDone={() => setApproval(null)} />
         )}
         {openSessionId && (
-          <GlobalInteractionModal sessionId={openSessionId} onClose={() => setOpenSessionId(null)} />
+          <GlobalInteractionModal sessionId={openSessionId} autoClose={openAuto} onClose={() => setOpenSessionId(null)} />
         )}
         {extractToast}
       </>
@@ -315,6 +321,7 @@ function AppInner() {
       <AppNav projects={projects} sessions={wrapperSessions} liveIds={liveIds} statusById={statusById} onChanged={reload} />
 
       <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+        <EngineHealthBanner />
         <main style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
           <Routes>
             <Route path="/" element={
@@ -325,7 +332,7 @@ function AppInner() {
                 reloadSnapshots={reloadSnapshots}
                 onNewSession={() => setShowWizard(true)}
                 reloadKey={reloadKey}
-                onOpenSession={setOpenSessionId}
+                onOpenSession={(id) => { setOpenAuto(false); setOpenSessionId(id); }}
               />
             } />
             <Route path="/projects" element={<Dashboard onPendingCount={() => { /* badge gerido alhures */ }} />} />

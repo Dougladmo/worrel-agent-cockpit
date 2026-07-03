@@ -343,10 +343,20 @@ export function listAdapters(): Promise<DetectedAdapter[]> {
   return req('/adapters');
 }
 
+// ReasoningLevel: nível normalizado de raciocínio/thinking exposto na UI. Vazio
+// = default do harness. Cada adapter traduz para o mecanismo do seu CLI.
+export type ReasoningLevel = '' | 'off' | 'low' | 'medium' | 'high';
+
+// listModels lista os modelos disponíveis para um harness (via a subscription/
+// login ativo do usuário). Vazio quando o adapter não sabe enumerar.
+export function listModels(adapterId: string): Promise<string[]> {
+  return req<{ models: string[] }>(`/adapters/${adapterId}/models`).then((r) => r.models ?? []);
+}
+
 export function createSession(
   projectId: string,
   adapter: string,
-  opts?: { skill?: string; skillId?: string; agentId?: string }
+  opts?: { skill?: string; skillId?: string; agentId?: string; model?: string; reasoning?: ReasoningLevel }
 ): Promise<Session> {
   return req(`/projects/${projectId}/sessions`, {
     method: 'POST',
@@ -355,6 +365,8 @@ export function createSession(
       skill: opts?.skill ?? '',
       skill_id: opts?.skillId ?? '',
       agent_id: opts?.agentId ?? '',
+      model: opts?.model ?? '',
+      reasoning: opts?.reasoning ?? '',
     }),
   });
 }
@@ -480,10 +492,18 @@ export function setInjection(projectId: string, enabled: boolean): Promise<void>
   return req(`/projects/${projectId}/secrets/injection`, { method: 'PUT', body: JSON.stringify({ enabled }) });
 }
 
-export function createFreeSession(adapter: string, dirs?: string[], skill?: string): Promise<Session> {
+export function createFreeSession(
+  adapter: string,
+  dirs?: string[],
+  skill?: string,
+  opts?: { model?: string; reasoning?: ReasoningLevel }
+): Promise<Session> {
   return req('/sessions', {
     method: 'POST',
-    body: JSON.stringify({ adapter, dirs: dirs ?? [], skill: skill ?? '' }),
+    body: JSON.stringify({
+      adapter, dirs: dirs ?? [], skill: skill ?? '',
+      model: opts?.model ?? '', reasoning: opts?.reasoning ?? '',
+    }),
   });
 }
 
@@ -564,10 +584,16 @@ export type MemoryMode = 'inicio' | 'consulta';
 // createEngineSession cria uma sessão dirigida pelo motor stream-json (sem PTY):
 // a Home a gerencia 100% pelo canal AG-UI. mode = permissão do CC; memory = como
 // a memória do projeto entra na sessão.
-export function createEngineSession(projectId?: string, mode?: PermissionMode, memory?: MemoryMode, provider?: string): Promise<Session> {
+export function createEngineSession(
+  projectId?: string, mode?: PermissionMode, memory?: MemoryMode, provider?: string,
+  opts?: { model?: string; reasoning?: ReasoningLevel }
+): Promise<Session> {
   return req('/sessions/engine', {
     method: 'POST',
-    body: JSON.stringify({ project_id: projectId ?? '', mode: mode ?? 'auto', memory: memory ?? 'inicio', provider: provider ?? '' }),
+    body: JSON.stringify({
+      project_id: projectId ?? '', mode: mode ?? 'auto', memory: memory ?? 'inicio',
+      provider: provider ?? '', model: opts?.model ?? '', reasoning: opts?.reasoning ?? '',
+    }),
   });
 }
 
@@ -620,6 +646,23 @@ export async function getEngineSettings(id: string, sessionId?: string): Promise
   const r = await fetch(`/api/engines/${id}/settings${qs}`);
   const b = await r.json();
   return { enabled: !!b.enabled, harness: b.harness ?? '', model: b.model ?? '' };
+}
+
+// EngineHealth: um motor de IA indisponível agora (provider fora/timeout/vazio).
+export interface EngineHealth {
+  engine_id: string;
+  harness: string;
+  model: string;
+  kind: string;
+  last_error: string;
+  since: number;
+}
+
+// getEngineHealth lista os motores de IA que estão falhando agora (vazio = ok).
+export async function getEngineHealth(): Promise<EngineHealth[]> {
+  const r = await fetch('/api/engines/health');
+  const b = await r.json();
+  return b.engines ?? [];
 }
 
 // setEngineConfigValue grava um par chave/valor de config do motor no escopo

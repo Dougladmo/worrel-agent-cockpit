@@ -42,13 +42,14 @@ type Server struct {
 	titles         *progressCache       // cache do título "vivo" das sessões do motor
 	interpret      *interpretCache      // cache da interpretação de turnos-fala (auto-mode)
 	requestSummary *requestSummaryCache // cache do "Seu pedido" condensado (bloco do topo)
+	health         *engineHealth        // engines de IA indisponíveis (banner global)
 
 	reprocMu sync.Mutex      // protege reproc
 	reproc   map[string]bool // engineID em reprocessamento (impede lote concorrente)
 }
 
 func New(deps Deps) *Server {
-	s := &Server{deps: deps, mux: http.NewServeMux(), progress: newProgressCache(), titles: newProgressCache(), interpret: newInterpretCache(), requestSummary: newRequestSummaryCache(), reproc: map[string]bool{}}
+	s := &Server{deps: deps, mux: http.NewServeMux(), progress: newProgressCache(), titles: newProgressCache(), interpret: newInterpretCache(), requestSummary: newRequestSummaryCache(), health: newEngineHealth(), reproc: map[string]bool{}}
 	s.routes()
 	return s
 }

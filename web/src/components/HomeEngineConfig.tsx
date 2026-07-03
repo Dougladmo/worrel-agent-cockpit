@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import { getEngineSettings, setEngineConfigValue, setEngineEnabled } from '../api';
 
 // Harness selecionáveis — espelha internal/engine/engine.go:HarnessOptions.
-const HARNESSES = [
+export const HARNESSES = [
   { value: '', label: 'Padrão' },
   { value: 'claude-code', label: 'Claude Code' },
   { value: 'opencode', label: 'opencode' },
@@ -32,7 +32,7 @@ const HEC_CSS = `
 .ec-input:focus { outline: none; border-color: var(--orange, #e08a3c); }
 `;
 
-function ModelPicker({ harness, current, onSelect }: { harness: string; current: string; onSelect: (v: string) => void }) {
+export function ModelPicker({ harness, current, onSelect }: { harness: string; current: string; onSelect: (v: string) => void }) {
   const [models, setModels] = useState<string[]>([]);
   useEffect(() => {
     const id = harness || 'claude-code';

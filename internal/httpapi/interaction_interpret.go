@@ -89,6 +89,7 @@ func (s *Server) attachInterpretation(snap *agui.Snapshot) {
 		llm, opts := s.summarizerFor("interpret", "")
 		out, err := llm.RunHeadless(ctx, prompt, opts)
 		if err != nil {
+			s.noteEngineFail("interpret", id, "agent_self", prompt, classifyLLMErr(err), err)
 			s.interpret.release(id)
 			return
 		}
@@ -99,6 +100,7 @@ func (s *Server) attachInterpretation(snap *agui.Snapshot) {
 				Input: prompt, Output: out,
 			})
 		}
+		s.noteEngineOk("interpret")
 		s.interpret.store(id, msg, agui.ParseInterpretation(out))
 		s.deps.Bus.Publish(bus.Event{Type: "interaction.changed", Payload: map[string]any{"session_id": id}})
 	}()

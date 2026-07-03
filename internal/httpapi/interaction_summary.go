@@ -80,25 +80,10 @@ func (c *progressCache) release(id string) {
 // resolve para um adapter headless registrado, usa-o; senão cai no Summarizer
 // padrão. opts.Model carrega o modelo configurado (vazio = default do CLI).
 func (s *Server) summarizerFor(engineID, sessionID string) (HeadlessLLM, adapter.HeadlessOpts) {
-	get := func(key string) string {
-		if s.deps.Store == nil {
-			return ""
-		}
-		if sessionID != "" {
-			if m, err := s.deps.Store.GetEngineConfig(engineID, "session:"+sessionID); err == nil {
-				if v, ok := m[key]; ok && v != "" {
-					return v
-				}
-			}
-		}
-		if m, err := s.deps.Store.GetEngineConfig(engineID, ""); err == nil {
-			return m[key]
-		}
-		return ""
-	}
-	opts := adapter.HeadlessOpts{Model: get("model")}
-	if h := get("harness"); h != "" && s.deps.Adapters != nil {
-		if ad, ok := s.deps.Adapters.Get(h); ok && ad.Capabilities().Headless {
+	harness, model := s.resolveHarnessModel(engineID, sessionID)
+	opts := adapter.HeadlessOpts{Model: model}
+	if harness != "" && s.deps.Adapters != nil {
+		if ad, ok := s.deps.Adapters.Get(harness); ok && ad.Capabilities().Headless {
 			return ad, opts
 		}
 	}
@@ -132,6 +117,13 @@ func (s *Server) attachEngineSummary(snap *agui.Snapshot) {
 		llm, opts := s.summarizerFor("summary", id)
 		out, err := llm.RunHeadless(ctx, prompt, opts)
 		if err != nil {
+			s.noteEngineFail("summary", id, "realtime", prompt, classifyLLMErr(err), err)
+			s.titles.release(id)
+			return
+		}
+		title, lines := agui.ParseProgress(out)
+		if title == "" && len(lines) == 0 {
+			s.noteEngineFail("summary", id, "realtime", prompt, "empty", nil)
 			s.titles.release(id)
 			return
 		}
@@ -142,7 +134,7 @@ func (s *Server) attachEngineSummary(snap *agui.Snapshot) {
 				Input: prompt, Output: out,
 			})
 		}
-		title, lines := agui.ParseProgress(out)
+		s.noteEngineOk("summary")
 		s.titles.store(id, lines, atLen)
 		if title != "" {
 			_ = s.deps.Store.SetSessionTitle(id, title)
@@ -188,6 +180,13 @@ func (s *Server) attachProgress(snap *agui.Snapshot, events []*store.TranscriptE
 		llm, opts := s.summarizerFor("summary", id)
 		out, err := llm.RunHeadless(ctx, prompt, opts)
 		if err != nil {
+			s.noteEngineFail("summary", id, "realtime", prompt, classifyLLMErr(err), err)
+			s.progress.release(id)
+			return
+		}
+		title, parsed := agui.ParseProgress(out)
+		if len(parsed) == 0 && title == "" {
+			s.noteEngineFail("summary", id, "realtime", prompt, "empty", nil)
 			s.progress.release(id)
 			return
 		}
@@ -198,11 +197,7 @@ func (s *Server) attachProgress(snap *agui.Snapshot, events []*store.TranscriptE
 				Input: prompt, Output: out,
 			})
 		}
-		title, parsed := agui.ParseProgress(out)
-		if len(parsed) == 0 && title == "" {
-			s.progress.release(id)
-			return
-		}
+		s.noteEngineOk("summary")
 		s.progress.store(id, parsed, atLen)
 		// título "vivo": sobrescreve o nome da sessão e avisa a UI (sidebar/card).
 		if title != "" {
@@ -236,6 +231,13 @@ func (s *Server) TitleOnTurnEnd(sessionID string, history []agui.HistoryLine) {
 		llm, opts := s.summarizerFor("summary", sessionID)
 		out, err := llm.RunHeadless(ctx, prompt, opts)
 		if err != nil {
+			s.noteEngineFail("summary", sessionID, "turn_end", prompt, classifyLLMErr(err), err)
+			s.titles.release(sessionID)
+			return
+		}
+		title, lines := agui.ParseProgress(out)
+		if title == "" && len(lines) == 0 {
+			s.noteEngineFail("summary", sessionID, "turn_end", prompt, "empty", nil)
 			s.titles.release(sessionID)
 			return
 		}
@@ -245,7 +247,7 @@ func (s *Server) TitleOnTurnEnd(sessionID string, history []agui.HistoryLine) {
 				Input: prompt, Output: out,
 			})
 		}
-		title, lines := agui.ParseProgress(out)
+		s.noteEngineOk("summary")
 		s.titles.store(sessionID, lines, atLen)
 		if title != "" {
 			_ = s.deps.Store.SetSessionTitle(sessionID, title)

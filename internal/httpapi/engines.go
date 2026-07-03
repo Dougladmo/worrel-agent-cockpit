@@ -32,6 +32,12 @@ func (s *Server) routesEngines() {
 		writeJSON(w, http.StatusOK, out)
 	})
 
+	// Engines de IA indisponíveis agora (provider fora/timeout) — alimenta o
+	// banner global "IA indisponível". Vazio = tudo saudável.
+	s.mux.HandleFunc("GET /api/engines/health", func(w http.ResponseWriter, r *http.Request) {
+		writeJSON(w, http.StatusOK, map[string]any{"engines": s.health.list()})
+	})
+
 	s.mux.HandleFunc("GET /api/engines/activity", func(w http.ResponseWriter, r *http.Request) {
 		log, err := s.deps.Store.ListEngineLog(100)
 		if err != nil {
