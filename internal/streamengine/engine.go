@@ -16,6 +16,8 @@ import (
 	"bufio"
 	"context"
 	"encoding/json"
+	"fmt"
+	"os"
 	"os/exec"
 	"strings"
 	"sync"
@@ -59,6 +61,29 @@ type Opts struct {
 	Mode         PermissionMode // modo de permissão ("auto" se vazio)
 	SystemAppend string         // memória injetada no início (--append-system-prompt)
 	MCPURL       string         // MCP do worrel p/ a sessão CONSULTAR a memória sob demanda
+	// Model sobrescreve o modelo do CLI (vazio = default). Formato por driver:
+	// claude usa o id; codex idem; opencode usa "provider/model".
+	Model string
+	// Reasoning é o nível normalizado ("" | "off" | "low" | "medium" | "high").
+	// Cada driver traduz para o mecanismo do seu CLI e ignora quando não há.
+	Reasoning string
+}
+
+// thinkingTokens traduz Reasoning para o orçamento MAX_THINKING_TOKENS do Claude.
+// ok=false quando não se deve emitir nada (nível vazio/desconhecido).
+func thinkingTokens(level string) (int, bool) {
+	switch level {
+	case "off":
+		return 0, true
+	case "low":
+		return 4096, true
+	case "medium":
+		return 10000, true
+	case "high":
+		return 32000, true
+	default:
+		return 0, false
+	}
 }
 
 // claudeArgs são os flags provados: stream-json bidirecional + permissão via stdio.
@@ -79,6 +104,9 @@ func claudeArgs(o Opts) []string {
 		// FALAR a pergunta — que a interpretação por IA renderiza em opções.
 		"--disallowedTools", "AskUserQuestion",
 	}
+	if o.Model != "" {
+		args = append(args, "--model", o.Model)
+	}
 	if o.SystemAppend != "" {
 		args = append(args, "--append-system-prompt", o.SystemAppend)
 	}
@@ -98,6 +126,10 @@ func mcpConfigJSON(url string) string {
 func Start(ctx context.Context, sessionID, cwd string, o Opts, onChange func(string), persist func(role, text string)) (*Session, error) {
 	cmd := exec.CommandContext(ctx, "claude", claudeArgs(o)...)
 	cmd.Dir = cwd
+	// Reasoning: o Claude não tem flag de thinking; o orçamento vai por env.
+	if tok, ok := thinkingTokens(o.Reasoning); ok {
+		cmd.Env = append(os.Environ(), fmt.Sprintf("MAX_THINKING_TOKENS=%d", tok))
+	}
 	stdin, err := cmd.StdinPipe()
 	if err != nil {
 		return nil, err

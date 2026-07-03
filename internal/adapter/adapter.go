@@ -40,6 +40,42 @@ type SpawnOpts struct {
 	ExtraEnv     []string // env vars adicionais (formato KEY=VALUE); fase 5 injeta vault.InjectableEnv aqui sem re-editar wrapper.go
 	SelfExe    string   // caminho absoluto do binário worrel (para o comando do hook); vazio = sem hook
 	Port       int      // porta do servidor worrel (para a URL do hook); 0 = sem hook
+	// Model sobrescreve o modelo do CLI para esta sessão (vazio = default do CLI).
+	// Formato depende do adapter (ver HeadlessOpts.Model).
+	Model string
+	// Reasoning é o nível de raciocínio/thinking normalizado (ver ReasoningLevel):
+	// "" | "off" | "low" | "medium" | "high". Cada adapter traduz para o mecanismo
+	// do seu CLI (flag, config ou env) e ignora quando o CLI não tem mecanismo.
+	Reasoning string
+}
+
+// ReasoningLevel é o enum normalizado de raciocínio/thinking exposto na UI.
+// Cada adapter mapeia estes valores para o mecanismo do seu CLI. String vazia
+// significa "default do CLI" (não emitir nada).
+const (
+	ReasoningOff    = "off"
+	ReasoningLow    = "low"
+	ReasoningMedium = "medium"
+	ReasoningHigh   = "high"
+)
+
+// ThinkingTokens traduz um ReasoningLevel para um orçamento de tokens de thinking
+// (usado por CLIs que controlam thinking por orçamento, ex.: Claude via
+// MAX_THINKING_TOKENS). Devolve (tokens, ok=false) quando não se deve emitir nada
+// ("" = default do CLI; "off" = desligar explicitamente com 0).
+func ThinkingTokens(level string) (int, bool) {
+	switch level {
+	case ReasoningOff:
+		return 0, true
+	case ReasoningLow:
+		return 4096, true
+	case ReasoningMedium:
+		return 10000, true
+	case ReasoningHigh:
+		return 32000, true
+	default:
+		return 0, false
+	}
 }
 
 // CmdSpec é o resultado puro de BuildInteractive: o que o PTY vai executar.
@@ -61,6 +97,9 @@ type HeadlessOpts struct {
 	// Formato depende do adapter: opencode usa "provider/model"
 	// (ex.: "anthropic/claude-sonnet-4-6"); claude-code usa o id (ex.: "claude-sonnet-4-6").
 	Model string
+	// Reasoning é o nível de raciocínio/thinking normalizado (ver ReasoningLevel).
+	// Cada adapter traduz para o mecanismo do seu CLI; ignora quando não há.
+	Reasoning string
 }
 
 // SessionRef referencia uma sessão externa (fase 4).

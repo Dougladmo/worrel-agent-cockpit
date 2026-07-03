@@ -52,13 +52,13 @@ func (s *Server) handleAdapters(w http.ResponseWriter, r *http.Request) {
 }
 
 // spawnFor monta opts/spec e spawna; usado pela sessão de projeto e pela livre.
-func (s *Server) spawnFor(w http.ResponseWriter, sess *store.Session, adapterID, skill, persona string) {
+func (s *Server) spawnFor(w http.ResponseWriter, sess *store.Session, adapterID, skill, persona, model, reasoning string) {
 	ad, ok := s.deps.Adapters.Get(adapterID)
 	if !ok {
 		writeErr(w, 400, "adaptador desconhecido: "+adapterID)
 		return
 	}
-	opts, err := wrapper.BuildSpawnOpts(s.deps.Store, s.deps.Workspace, sess.ID, s.deps.Port, skill, persona)
+	opts, err := wrapper.BuildSpawnOpts(s.deps.Store, s.deps.Workspace, sess.ID, s.deps.Port, skill, persona, model, reasoning)
 	if err != nil {
 		writeErr(w, 500, err.Error())
 		return
@@ -87,10 +87,12 @@ func (s *Server) spawnFor(w http.ResponseWriter, sess *store.Session, adapterID,
 func (s *Server) handleCreateSession(w http.ResponseWriter, r *http.Request) {
 	projectID := r.PathValue("id")
 	var body struct {
-		Adapter string `json:"adapter"`
-		Skill   string `json:"skill"`    // conteúdo opcional p/ "iniciar a partir de skill"
-		SkillID string `json:"skill_id"` // id de skill a resolver no backend
-		AgentID string `json:"agent_id"` // id de agente; persona vai para SystemAppend
+		Adapter   string `json:"adapter"`
+		Skill     string `json:"skill"`     // conteúdo opcional p/ "iniciar a partir de skill"
+		SkillID   string `json:"skill_id"`  // id de skill a resolver no backend
+		AgentID   string `json:"agent_id"`  // id de agente; persona vai para SystemAppend
+		Model     string `json:"model"`     // modelo do harness (vazio = default)
+		Reasoning string `json:"reasoning"` // nível de reasoning ("" | off | low | medium | high)
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		writeErr(w, 400, "body inválido: "+err.Error())
@@ -118,14 +120,16 @@ func (s *Server) handleCreateSession(w http.ResponseWriter, r *http.Request) {
 		writeErr(w, 500, err.Error())
 		return
 	}
-	s.spawnFor(w, sess, body.Adapter, body.Skill, persona)
+	s.spawnFor(w, sess, body.Adapter, body.Skill, persona, body.Model, body.Reasoning)
 }
 
 func (s *Server) handleCreateFreeSession(w http.ResponseWriter, r *http.Request) {
 	var body struct {
-		Adapter string   `json:"adapter"`
-		Skill   string   `json:"skill"`
-		Dirs    []string `json:"dirs"` // pastas opcionais a linkar no scratch
+		Adapter   string   `json:"adapter"`
+		Skill     string   `json:"skill"`
+		Dirs      []string `json:"dirs"`      // pastas opcionais a linkar no scratch
+		Model     string   `json:"model"`     // modelo do harness (vazio = default)
+		Reasoning string   `json:"reasoning"` // nível de reasoning
 	}
 	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
 		writeErr(w, 400, "body inválido")
@@ -150,7 +154,7 @@ func (s *Server) handleCreateFreeSession(w http.ResponseWriter, r *http.Request)
 	}
 	_ = s.deps.Store.SetSessionWorkspaceDir(sess.ID, scratch)
 	sess, _ = s.deps.Store.GetSession(sess.ID)
-	s.spawnFor(w, sess, body.Adapter, body.Skill, "")
+	s.spawnFor(w, sess, body.Adapter, body.Skill, "", body.Model, body.Reasoning)
 }
 
 func (s *Server) handleClassifySession(w http.ResponseWriter, r *http.Request) {
@@ -207,13 +211,21 @@ func (s *Server) handleKillSession(w http.ResponseWriter, r *http.Request) {
 	// Best-effort: mata o PTY se ainda estiver vivo NESTE processo. Após um
 	// restart do servidor o processo não existe mais no mapa em memória — isso
 	// não é erro (a sessão fica "órfã": active no banco, sem PTY vivo).
-	_ = s.deps.Wrapper.Kill(id)
+	// Quando há um PTY vivo, a goroutine de saída do wrapper publica session.ended;
+	// se Kill falhar (sessão de motor ou órfã), ninguém publica — cabe a nós.
+	wrapperHandled := s.deps.Wrapper.Kill(id) == nil
 	// Encerra a sessão no store SEMPRE, para que ela saia da faixa de ativas
 	// mesmo quando o PTY já não existe. Sem isso, o × não disparava nada para
 	// sessões órfãs (Kill falhava com 404 e a sessão seguia active).
 	if err := s.deps.Store.EndSession(id); err != nil {
 		writeErr(w, 404, err.Error())
 		return
+	}
+	// Publica session.ended quando o wrapper não o fez (motor/órfã). É esse evento
+	// que faz a Home e a sidebar recarregarem e removerem a miniatura da sessão —
+	// sem ele, o "Encerrar" fecha o modal mas a sessão continua visível.
+	if !wrapperHandled {
+		s.deps.Bus.Publish(bus.Event{Type: "session.ended", Payload: map[string]any{"id": id}})
 	}
 	w.WriteHeader(204)
 }

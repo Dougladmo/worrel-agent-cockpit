@@ -19,6 +19,13 @@ type opencodeDriver struct{}
 
 func (opencodeDriver) Start(ctx context.Context, sessionID, cwd string, o Opts,
 	onChange func(string), persist func(role, text string)) (LiveSession, error) {
+	// Modelo/Reasoning DEGRADADOS no motor opencode: o subcomando `opencode acp`
+	// NÃO aceita --model nem --variant (só o modo run/interativo aceita), e o ACP
+	// não expõe seleção de modelo confiável no session/new. Usamos o default do
+	// opencode. o.Model/o.Reasoning são ignorados conscientemente (sem flag
+	// inventada). TODO(confirmar): session/set_model quando o ACP suportar.
+	_ = o.Model
+	_ = o.Reasoning
 	cmd := exec.CommandContext(ctx, "opencode", "acp", "--cwd", cwd)
 	cmd.Dir = cwd
 	stdin, err := cmd.StdinPipe()

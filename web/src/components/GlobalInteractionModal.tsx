@@ -9,13 +9,17 @@ import InteractionPanel from './InteractionPanel';
 interface Props {
   // Sessão cuja interação está aberta (auto, clique no card ou bolinha de adiada).
   sessionId: string;
+  // autoClose: modal aberto pela FILA (pergunta pendente/bolinha). Quando a
+  // interação se resolve sozinha (interrupt some, turno vira working/ended) não
+  // há mais nada a fazer — o modal se fecha. Abertura manual (card) não fecha.
+  autoClose?: boolean;
   onClose: () => void;
 }
 
 // GlobalInteractionModal é a janela de resposta ao agente promovida a nível
 // global (App). Busca o snapshot AG-UI da sessão aberta e se reatualiza quando a
 // interação dela muda. Fechar (X/overlay) não responde nada — só some.
-export default function GlobalInteractionModal({ sessionId, onClose }: Props) {
+export default function GlobalInteractionModal({ sessionId, autoClose, onClose }: Props) {
   const navigate = useNavigate();
   const [snap, setSnap] = useState<InteractionSnapshot | null>(null);
 
@@ -23,6 +27,15 @@ export default function GlobalInteractionModal({ sessionId, onClose }: Props) {
     getInteraction(sessionId).then(setSnap).catch(() => setSnap(null));
   }, [sessionId]);
   useEffect(() => { setSnap(null); load(); }, [load]);
+
+  // Auto-aberto e nada mais pendente (sem interrupt e turno já não é do usuário):
+  // a interação se resolveu — fecha em vez de ficar preso em "nenhuma ação
+  // pendente". Aberturas manuais (autoClose=false) permanecem para prompt livre.
+  useEffect(() => {
+    if (autoClose && snap && !snap.interrupt && snap.state !== 'awaiting') {
+      onClose();
+    }
+  }, [autoClose, snap, onClose]);
 
   useEvents(useCallback((ev) => {
     const p = ev.payload as { session_id?: string; id?: string };

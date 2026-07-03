@@ -108,11 +108,35 @@ func hookConfigOverrides(selfExe, sessionID string, port int) []string {
 	}
 }
 
+// reasoningEffortOverride traduz um ReasoningLevel para o `-c
+// model_reasoning_effort=<v>` do Codex (minimal|low|medium|high). Devolve nil
+// quando não se deve emitir nada (nível vazio/desconhecido).
+func reasoningEffortOverride(level string) []string {
+	effort := ""
+	switch level {
+	case adapter.ReasoningOff:
+		effort = "minimal"
+	case adapter.ReasoningLow:
+		effort = "low"
+	case adapter.ReasoningMedium:
+		effort = "medium"
+	case adapter.ReasoningHigh:
+		effort = "high"
+	default:
+		return nil
+	}
+	return []string{"-c", "model_reasoning_effort=" + strconv.Quote(effort)}
+}
+
 func (a *Adapter) BuildInteractive(opts adapter.SpawnOpts) (adapter.CmdSpec, error) {
 	args := []string{}
 	if opts.WorkingDir != "" {
 		args = append(args, "-C", opts.WorkingDir)
 	}
+	if opts.Model != "" {
+		args = append(args, "-m", opts.Model)
+	}
+	args = append(args, reasoningEffortOverride(opts.Reasoning)...)
 	if opts.MCPURL != "" {
 		args = append(args, mcpConfigOverrides(opts.MCPURL)...)
 	}
@@ -141,6 +165,7 @@ func buildExecArgs(prompt string, opts adapter.HeadlessOpts, lastMsgFile string)
 	if opts.Model != "" {
 		args = append(args, "-m", opts.Model)
 	}
+	args = append(args, reasoningEffortOverride(opts.Reasoning)...)
 	if lastMsgFile != "" {
 		args = append(args, "-o", lastMsgFile)
 	}
@@ -166,7 +191,7 @@ func (a *Adapter) RunHeadless(ctx context.Context, prompt string, opts adapter.H
 
 	cmd := exec.CommandContext(ctx, "codex", args...)
 	cmd.Dir = opts.WorkingDir
-	out, err := cmd.Output()
+	out, err := adapter.HeadlessOutput(cmd)
 	if err != nil {
 		return string(out), err
 	}

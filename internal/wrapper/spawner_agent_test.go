@@ -17,7 +17,7 @@ func TestBuildSpawnOptsAgentPersona(t *testing.T) {
 	sess, _ := st.CreateSession(&store.Session{Adapter: "claude-code", Mode: "wrapper"})
 
 	persona := "Você é um revisor Go rigoroso."
-	opts, err := BuildSpawnOpts(st, wm, sess.ID, 8080, "", persona)
+	opts, err := BuildSpawnOpts(st, wm, sess.ID, 8080, "", persona, "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -27,7 +27,7 @@ func TestBuildSpawnOptsAgentPersona(t *testing.T) {
 
 	// skill still in Primer
 	skillContent := "## minha skill"
-	opts2, err := BuildSpawnOpts(st, wm, sess.ID, 8080, skillContent, persona)
+	opts2, err := BuildSpawnOpts(st, wm, sess.ID, 8080, skillContent, persona, "", "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -39,7 +39,7 @@ func TestBuildSpawnOptsAgentPersona(t *testing.T) {
 	}
 
 	// no persona → empty SystemAppend
-	opts3, err := BuildSpawnOpts(st, wm, sess.ID, 8080, "", "")
+	opts3, err := BuildSpawnOpts(st, wm, sess.ID, 8080, "", "", "", "")
 	if err != nil {
 		t.Fatal(err)
 	}

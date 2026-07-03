@@ -113,6 +113,15 @@ func (a *Adapter) BuildInteractive(opts adapter.SpawnOpts) (adapter.CmdSpec, err
 	if opts.SessionID != "" {
 		args = append(args, "--session-id", opts.SessionID)
 	}
+	if opts.Model != "" {
+		args = append(args, "--model", opts.Model)
+	}
+	// Reasoning: o Claude Code não tem flag de thinking; o orçamento é controlado
+	// pela env MAX_THINKING_TOKENS (0 = desligado). String vazia = default do CLI.
+	var env []string
+	if tok, ok := adapter.ThinkingTokens(opts.Reasoning); ok {
+		env = append(env, fmt.Sprintf("MAX_THINKING_TOKENS=%d", tok))
+	}
 	if opts.SystemAppend != "" {
 		args = append(args, "--append-system-prompt", opts.SystemAppend)
 	}
@@ -134,7 +143,7 @@ func (a *Adapter) BuildInteractive(opts adapter.SpawnOpts) (adapter.CmdSpec, err
 	if strings.TrimSpace(opts.Primer) != "" {
 		args = append(args, "--", opts.Primer)
 	}
-	return adapter.CmdSpec{Path: "claude", Args: args, Dir: opts.WorkingDir, Cleanup: cleanup}, nil
+	return adapter.CmdSpec{Path: "claude", Args: args, Env: env, Dir: opts.WorkingDir, Cleanup: cleanup}, nil
 }
 
 // buildRunArgs monta os argumentos do `claude` headless. O modelo (opts.Model),
@@ -153,7 +162,10 @@ func buildRunArgs(prompt string, opts adapter.HeadlessOpts) []string {
 func (a *Adapter) RunHeadless(ctx context.Context, prompt string, opts adapter.HeadlessOpts) (string, error) {
 	cmd := exec.CommandContext(ctx, "claude", buildRunArgs(prompt, opts)...)
 	cmd.Dir = opts.WorkingDir
-	out, err := cmd.Output()
+	if tok, ok := adapter.ThinkingTokens(opts.Reasoning); ok {
+		cmd.Env = append(os.Environ(), fmt.Sprintf("MAX_THINKING_TOKENS=%d", tok))
+	}
+	out, err := adapter.HeadlessOutput(cmd)
 	if err != nil {
 		return string(out), err
 	}

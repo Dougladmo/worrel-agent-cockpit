@@ -91,6 +91,12 @@ func (a *Adapter) BuildInteractive(opts adapter.SpawnOpts) (adapter.CmdSpec, err
 // (SpawnOpts ainda não carrega um permMode; quando carregar, condiciona-se aqui.)
 func buildInteractiveArgs(opts adapter.SpawnOpts) []string {
 	args := []string{}
+	if opts.Model != "" {
+		args = append(args, "--model", opts.Model)
+	}
+	// Reasoning DEGRADADO: o `agy` não expõe flag de reasoning/thinking conhecido.
+	// opts.Reasoning é ignorado conscientemente (sem flag inventada).
+	_ = opts.Reasoning
 	if strings.TrimSpace(opts.Primer) != "" {
 		args = append(args, "-i", opts.Primer)
 	}
@@ -114,7 +120,7 @@ func (a *Adapter) RunHeadless(ctx context.Context, prompt string, opts adapter.H
 	args := buildRunArgs(prompt, opts)
 	cmd := exec.CommandContext(ctx, "agy", args...)
 	cmd.Dir = opts.WorkingDir
-	out, err := cmd.Output()
+	out, err := adapter.HeadlessOutput(cmd)
 	if err != nil {
 		return string(out), err
 	}

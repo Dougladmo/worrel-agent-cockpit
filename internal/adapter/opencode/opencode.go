@@ -66,10 +66,34 @@ func writeMCPConfig(configDir, url string) (string, error) {
 	return path, nil
 }
 
+// opencodeVariant traduz um ReasoningLevel para o valor de `--variant` do
+// opencode (esforço de reasoning). low/medium/high mapeiam direto; off/"" (ou
+// desconhecido) devolvem "" → o chamador omite o flag (default do provider).
+func opencodeVariant(level string) string {
+	switch level {
+	case adapter.ReasoningLow:
+		return "low"
+	case adapter.ReasoningMedium:
+		return "medium"
+	case adapter.ReasoningHigh:
+		return "high"
+	default:
+		return ""
+	}
+}
+
 func (a *Adapter) BuildInteractive(opts adapter.SpawnOpts) (adapter.CmdSpec, error) {
 	args := []string{}
 	if opts.WorkingDir != "" {
 		args = append(args, opts.WorkingDir) // path posicional do projeto
+	}
+	if opts.Model != "" {
+		args = append(args, "--model", opts.Model) // formato "provider/model"
+	}
+	// Reasoning: o opencode expõe --variant (esforço de reasoning específico do
+	// provider, ex.: high/medium/low). off/"" = default do provider (omite).
+	if v := opencodeVariant(opts.Reasoning); v != "" {
+		args = append(args, "--variant", v)
 	}
 	if strings.TrimSpace(opts.Primer) != "" {
 		args = append(args, "--prompt", opts.Primer)
@@ -96,6 +120,9 @@ func buildRunArgs(opts adapter.HeadlessOpts) []string {
 	if opts.Model != "" {
 		args = append(args, "--model", opts.Model)
 	}
+	if v := opencodeVariant(opts.Reasoning); v != "" {
+		args = append(args, "--variant", v)
+	}
 	return args
 }
 
@@ -103,7 +130,7 @@ func (a *Adapter) RunHeadless(ctx context.Context, prompt string, opts adapter.H
 	cmd := exec.CommandContext(ctx, "opencode", buildRunArgs(opts)...)
 	cmd.Dir = opts.WorkingDir
 	cmd.Stdin = strings.NewReader(prompt) // prompt por stdin: evita estourar ARG_MAX
-	out, err := cmd.Output()
+	out, err := adapter.HeadlessOutput(cmd)
 	if err != nil {
 		return string(out), err
 	}

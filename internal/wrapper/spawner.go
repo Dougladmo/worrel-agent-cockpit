@@ -15,7 +15,7 @@ import (
 // gera/persiste o token MCP, monta primer (memória + skill opcional) e a URL.
 // O cwd é resolvido pelo workspace gerenciado: sess.WorkspaceDir se preenchido,
 // senão o workspace do projeto (via wm.SyncProject), senão um scratch por sessão.
-func BuildSpawnOpts(st *store.Store, wm *workspace.Manager, sessionID string, port int, skillContent, agentPersona string) (adapter.SpawnOpts, error) {
+func BuildSpawnOpts(st *store.Store, wm *workspace.Manager, sessionID string, port int, skillContent, agentPersona, model, reasoning string) (adapter.SpawnOpts, error) {
 	sess, err := st.GetSession(sessionID)
 	if err != nil {
 		return adapter.SpawnOpts{}, err
@@ -98,5 +98,7 @@ func BuildSpawnOpts(st *store.Store, wm *workspace.Manager, sessionID string, po
 		MCPURL:       fmt.Sprintf("http://127.0.0.1:%d/mcp?s=%s", port, token),
 		SelfExe:      selfExe,
 		Port:         port,
+		Model:        model,
+		Reasoning:    reasoning,
 	}, nil
 }

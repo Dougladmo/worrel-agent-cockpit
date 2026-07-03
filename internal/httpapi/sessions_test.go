@@ -40,6 +40,11 @@ func (fakeCat) ReadTranscript(adapter.SessionRef) ([]adapter.TranscriptEvent, er
 func (fakeCat) ContextUsage(ref adapter.SessionRef) (used, limit int, ok bool) { return 0, 0, false }
 
 func newSessionsServer(t *testing.T) (*httptest.Server, *store.Store, *wrapper.Manager) {
+	ts, st, wm, _ := newSessionsServerBus(t)
+	return ts, st, wm
+}
+
+func newSessionsServerBus(t *testing.T) (*httptest.Server, *store.Store, *wrapper.Manager, *bus.Bus) {
 	t.Helper()
 	dir := t.TempDir()
 	s, err := store.Open(dir + "/t.db")
@@ -58,7 +63,7 @@ func newSessionsServer(t *testing.T) (*httptest.Server, *store.Store, *wrapper.M
 		Wrapper: wm, Workspace: wsm, Adapters: reg, Port: 7717})
 	ts := httptest.NewServer(srv.Handler())
 	t.Cleanup(ts.Close)
-	return ts, s, wm
+	return ts, s, wm, b
 }
 
 func TestAdaptersEndpoint(t *testing.T) {
@@ -131,6 +136,39 @@ func TestKillOrphanSessionEndsIt(t *testing.T) {
 	got, _ := st.GetSession(sess.ID)
 	if got.Status != "ended" {
 		t.Fatalf("status após kill = %q, want ended", got.Status)
+	}
+}
+
+// TestKillOrphanPublishesEnded: matar uma sessão órfã (sem PTY/motor vivo) deve
+// publicar session.ended no bus — é esse evento que faz a Home/sidebar removerem
+// a miniatura. Sem ele, o "Encerrar" some do modal mas a sessão fica visível.
+func TestKillOrphanPublishesEnded(t *testing.T) {
+	ts, st, _, b := newSessionsServerBus(t)
+	sess, err := st.CreateSession(&store.Session{Adapter: "fake", Mode: "wrapper", Status: "active"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	ch, unsub := b.Subscribe()
+	defer unsub()
+
+	kr, _ := ts.Client().Post(ts.URL+"/api/sessions/"+sess.ID+"/kill", "application/json", nil)
+	if kr.StatusCode != 204 {
+		t.Fatalf("kill status %d", kr.StatusCode)
+	}
+
+	deadline := time.After(2 * time.Second)
+	for {
+		select {
+		case ev := <-ch:
+			if ev.Type == "session.ended" {
+				p, _ := ev.Payload.(map[string]any)
+				if p["id"] == sess.ID {
+					return
+				}
+			}
+		case <-deadline:
+			t.Fatal("timeout esperando session.ended após kill de sessão órfã")
+		}
 	}
 }
 

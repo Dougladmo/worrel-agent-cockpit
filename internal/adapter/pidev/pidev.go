@@ -89,7 +89,12 @@ func (a *Adapter) Detect() (adapter.Installed, error) {
 func (a *Adapter) BuildInteractive(opts adapter.SpawnOpts) (adapter.CmdSpec, error) {
 	args := []string{}
 
-	// Modelo não vem em SpawnOpts; mantido só no headless (HeadlessOpts.Model).
+	if opts.Model != "" {
+		args = append(args, "--model", opts.Model)
+	}
+	// Reasoning DEGRADADO: o Pi não expõe flag de reasoning/thinking conhecido.
+	// opts.Reasoning é ignorado conscientemente (sem flag inventada).
+	_ = opts.Reasoning
 
 	// TODO(confirmar): o Pi não tem MCP embutido — a doc recomenda uma extension.
 	// Quando o mecanismo for confirmado (flag de extension? arquivo de config?),

@@ -1,10 +1,10 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-  listProjects, listAdapters, listSkills, listAgents,
+  listProjects, listAdapters, listSkills, listAgents, listModels,
   createEngineSession, createSession, createFreeSession, sendPrompt,
 } from '../api';
-import type { Project, DetectedAdapter, Skill, Agent, Session, PermissionMode } from '../api';
+import type { Project, DetectedAdapter, Skill, Agent, Session, PermissionMode, ReasoningLevel } from '../api';
 import { markUsed, orderBy } from '../lastUsed';
 import NewProjectModal from './NewProjectModal';
 
@@ -49,6 +49,11 @@ export default function NewSessionWizard({ onCreated, onClose }: Props) {
   const [mode, setMode] = useState<Mode>('inicio');
   const [adapterId, setAdapterId] = useState('');
   const [permMode, setPermMode] = useState<PermissionMode>('auto');
+  // Modelo + reasoning do harness. models = lista enumerada do harness (vazia se
+  // o CLI não sabe listar); model/reasoning vazios = default do harness.
+  const [models, setModels] = useState<string[]>([]);
+  const [model, setModel] = useState('');
+  const [reasoning, setReasoning] = useState<ReasoningLevel>('');
   // seed: a semente da sessão — nada, uma skill ou um agent.
   const [seed, setSeed] = useState<{ kind: 'skill' | 'agent'; id: string } | null>(null);
   const [prompt, setPrompt] = useState('');
@@ -89,6 +94,18 @@ export default function NewSessionWizard({ onCreated, onClose }: Props) {
     if (adapterId === 'antigravity') setClassic(true);
   }, [adapterId]);
 
+  // Ao trocar de harness, reseta modelo/reasoning (o que era válido num CLI não
+  // vale no outro) e recarrega a lista de modelos do novo harness.
+  useEffect(() => {
+    setModel('');
+    setReasoning('');
+    setModels([]);
+    if (!adapterId) return;
+    let alive = true;
+    listModels(adapterId).then((m) => { if (alive) setModels(m); }).catch(() => { /* sem lista */ });
+    return () => { alive = false; };
+  }, [adapterId]);
+
   function pickProject(id: string | null) {
     setProjectId(id);
     setSeed(null);
@@ -107,14 +124,14 @@ export default function NewSessionWizard({ onCreated, onClose }: Props) {
       // Não passa pelo motor de eventos → SessionRoute abre o xterm. Sempre
       // navega para o terminal (não há miniatura interativa para essa sessão).
       if (classic) {
-        const seedOpts = seed?.kind === 'skill'
-          ? { skillId: seed.id }
-          : seed?.kind === 'agent'
-            ? { agentId: seed.id }
-            : undefined;
+        const seedOpts = {
+          ...(seed?.kind === 'skill' ? { skillId: seed.id } : {}),
+          ...(seed?.kind === 'agent' ? { agentId: seed.id } : {}),
+          model, reasoning,
+        };
         const sess = projectId
           ? await createSession(projectId, adapterId, seedOpts)
-          : await createFreeSession(adapterId);
+          : await createFreeSession(adapterId, undefined, undefined, { model, reasoning });
         onCreated(sess, true);
         return;
       }
@@ -122,7 +139,7 @@ export default function NewSessionWizard({ onCreated, onClose }: Props) {
       // ficar na Home (miniatura) ou abrir a conversa.
       // Sessão de motor (stream-json): passa o provider selecionado. O backend
       // valida (antigravity é bloqueado — sem protocolo stream).
-      const sess = await createEngineSession(projectId ?? undefined, permMode, mode, adapterId);
+      const sess = await createEngineSession(projectId ?? undefined, permMode, mode, adapterId, { model, reasoning });
       if (prompt.trim()) await sendPrompt(sess.id, prompt.trim());
       onCreated(sess, openTerminal);
     } catch (err) {
@@ -165,6 +182,29 @@ export default function NewSessionWizard({ onCreated, onClose }: Props) {
               aria-label={t('home.wizard.provider')}>
               {adapters.length === 0 && <option value="">—</option>}
               {adapters.map((a) => <option key={a.id} value={a.id}>{a.id}</option>)}
+            </select>
+          </label>
+          {/* Modelo do harness: só aparece quando o CLI sabe enumerar modelos.
+              Vazio = default do harness. */}
+          {models.length > 0 && (
+            <label className="nsw-model" title={t('home.wizard.modelHint')}>
+              <select value={model} onChange={(e) => setModel(e.target.value)}
+                aria-label={t('home.wizard.model')}>
+                <option value="">{t('home.wizard.modelDefault')}</option>
+                {models.map((m) => <option key={m} value={m}>{m}</option>)}
+              </select>
+            </label>
+          )}
+          {/* Reasoning/thinking normalizado. Harnesses sem mecanismo ignoram no
+              backend; expomos igual para consistência. */}
+          <label className="nsw-reasoning" title={t('home.wizard.reasoningHint')}>
+            <select value={reasoning} onChange={(e) => setReasoning(e.target.value as ReasoningLevel)}
+              aria-label={t('home.wizard.reasoning')}>
+              <option value="">{t('home.wizard.reasoningDefault')}</option>
+              <option value="off">{t('home.wizard.reasoningOff')}</option>
+              <option value="low">{t('home.wizard.reasoningLow')}</option>
+              <option value="medium">{t('home.wizard.reasoningMedium')}</option>
+              <option value="high">{t('home.wizard.reasoningHigh')}</option>
             </select>
           </label>
         </div>

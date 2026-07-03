@@ -27,9 +27,11 @@ func (s *Server) handleCreateEngineSession(w http.ResponseWriter, r *http.Reques
 	}
 	in, _ := decode[struct {
 		ProjectID string `json:"project_id"`
-		Provider  string `json:"provider"` // "" = claude-code; antigravity bloqueado
-		Mode      string `json:"mode"`     // modo de permissão ("" = auto)
-		Memory    string `json:"memory"`   // "inicio" injeta a memória; "consulta" liga o MCP
+		Provider  string `json:"provider"`  // "" = claude-code; antigravity bloqueado
+		Mode      string `json:"mode"`      // modo de permissão ("" = auto)
+		Memory    string `json:"memory"`    // "inicio" injeta a memória; "consulta" liga o MCP
+		Model     string `json:"model"`     // modelo do harness (vazio = default)
+		Reasoning string `json:"reasoning"` // nível de reasoning ("" | off | low | medium | high)
 	}](r)
 
 	provider, ok := normalizeProvider(in.Provider)
@@ -74,7 +76,7 @@ func (s *Server) handleCreateEngineSession(w http.ResponseWriter, r *http.Reques
 
 	// Memória do projeto: "inicio" injeta o markdown no system prompt; "consulta"
 	// liga o MCP do worrel para o agente buscar a memória (get_memory) sob demanda.
-	opts := streamengine.Opts{Mode: in.Mode}
+	opts := streamengine.Opts{Mode: in.Mode, Model: in.Model, Reasoning: in.Reasoning}
 	if in.ProjectID != "" {
 		switch in.Memory {
 		case "inicio":

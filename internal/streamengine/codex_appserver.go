@@ -17,9 +17,34 @@ import (
 // sobre stdio). Protocolo verificado no spike 2026-06-23-codex-app-server.md.
 type codexDriver struct{}
 
+// codexReasoningEffort traduz o Reasoning normalizado para o valor de
+// model_reasoning_effort do Codex. "" quando não se deve emitir nada.
+func codexReasoningEffort(level string) string {
+	switch level {
+	case "off":
+		return "minimal"
+	case "low":
+		return "low"
+	case "medium":
+		return "medium"
+	case "high":
+		return "high"
+	default:
+		return ""
+	}
+}
+
 func (codexDriver) Start(ctx context.Context, sessionID, cwd string, o Opts,
 	onChange func(string), persist func(role, text string)) (LiveSession, error) {
 	args := []string{"app-server"}
+	// O `codex app-server` não tem flag de modelo/reasoning; aplicamos via
+	// override de config global do processo (-c), que vale para a sessão inteira.
+	if o.Model != "" {
+		args = append(args, "-c", `model="`+o.Model+`"`)
+	}
+	if effort := codexReasoningEffort(o.Reasoning); effort != "" {
+		args = append(args, "-c", `model_reasoning_effort="`+effort+`"`)
+	}
 	if o.MCPURL != "" {
 		args = append(args, "-c", "experimental_use_rmcp_client=true",
 			"-c", `mcp_servers.worrel.url="`+o.MCPURL+`"`)
