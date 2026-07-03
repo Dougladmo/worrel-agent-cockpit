@@ -48,7 +48,7 @@ func (s *Store) ListDeferredSessions() ([]DeferredSession, error) {
 	// no mesmo milissegundo empatariam e a ordem ficaria indefinida. O rowid
 	// cresce com a criação, então o desempate favorece a sessão mais recente.
 	rows, err := s.db.Query(`SELECT id, COALESCE(project_id,''), deferred_at, COALESCE(deferred_kind,'defer')
-		FROM sessions WHERE deferred_at IS NOT NULL AND status != 'archived'
+		FROM sessions WHERE deferred_at IS NOT NULL AND status = 'active'
 		ORDER BY deferred_at DESC, rowid DESC`)
 	if err != nil {
 		return nil, err
