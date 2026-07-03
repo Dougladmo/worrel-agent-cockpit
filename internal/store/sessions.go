@@ -111,7 +111,7 @@ func (s *Store) ListSessions(projectID string) ([]*Session, error) {
 }
 
 func (s *Store) EndSession(id string) error {
-	result, err := s.db.Exec(`UPDATE sessions SET status='ended', ended_at=? WHERE id=?`, now(), id)
+	result, err := s.db.Exec(`UPDATE sessions SET status='ended', ended_at=?, deferred_at=NULL WHERE id=?`, now(), id)
 	if err != nil {
 		return err
 	}
@@ -132,7 +132,7 @@ func (s *Store) EndSession(id string) error {
 // vence — um Kill manual posterior não sobrescreve o crash original).
 func (s *Store) EndSessionWithReason(id, reason string) error {
 	result, err := s.db.Exec(`UPDATE sessions
-		SET status='ended', ended_at=COALESCE(ended_at, ?),
+		SET status='ended', ended_at=COALESCE(ended_at, ?), deferred_at=NULL,
 		    end_reason=CASE WHEN COALESCE(end_reason,'')='' THEN ? ELSE end_reason END
 		WHERE id=?`, now(), reason, id)
 	if err != nil {
@@ -340,7 +340,7 @@ func (s *Store) ListActiveWrapperSessions() ([]*Session, error) {
 // reaparecem na faixa de abas e ao clicar o usuário só encontra uma sessão morta
 // que precisa re-encerrar à mão. Devolve quantas foram reconciliadas.
 func (s *Store) EndOrphanedWrapperSessions() (int64, error) {
-	res, err := s.db.Exec(`UPDATE sessions SET status='ended', ended_at=COALESCE(ended_at, ?)
+	res, err := s.db.Exec(`UPDATE sessions SET status='ended', ended_at=COALESCE(ended_at, ?), deferred_at=NULL
 		WHERE mode='wrapper' AND status='active'`, now())
 	if err != nil {
 		return 0, err
