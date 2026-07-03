@@ -75,6 +75,15 @@ function AppInner() {
     setModalQueue((q) => (q.includes(sid) ? q : [...q, sid]));
   }, []);
 
+  // handleOpenDeferred abre um grupo de bolinhas adiadas (clique numa bolinha de
+  // projeto): enfileira TODAS as sessões do grupo (dedup) — o efeito de auto-open
+  // abaixo abre uma de cada vez. Diferente de enqueueAutoOpen, ignora deferredRef:
+  // clicar a bolinha é um pedido EXPLÍCITO de reabrir a sessão adiada.
+  const handleOpenDeferred = useCallback((ids: string[]) => {
+    if (ids.length === 0) return;
+    setModalQueue((q) => [...q, ...ids.filter((id) => !q.includes(id))]);
+  }, []);
+
   const handleEvent = useCallback((ev: WsEvent) => {
     if (ev.type === 'suggestion.created') setReloadKey((n) => n + 1);
     // Sessões de motor (stream-json) não emitem session.awaiting — só
@@ -327,7 +336,7 @@ function AppInner() {
         </main>
       </div>
 
-      <SuggestionsDrawer projects={projects} reloadKey={reloadKey} onOpen={setOpenSessionId} />
+      <SuggestionsDrawer projects={projects} reloadKey={reloadKey} onOpen={handleOpenDeferred} />
 
       {showWizard && (
         <NewSessionWizard onCreated={handleSessionCreated} onClose={() => setShowWizard(false)} />

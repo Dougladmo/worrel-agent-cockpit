@@ -212,3 +212,45 @@ func (s *Server) attachProgress(snap *agui.Snapshot, events []*store.TranscriptE
 		s.deps.Bus.Publish(bus.Event{Type: "interaction.changed", Payload: map[string]any{"session_id": id}})
 	}()
 }
+
+// TitleOnTurnEnd gera o título "vivo" da sessão no FIM DE TURNO (o agente parou
+// de responder), server-side, a partir do histórico em memória — sem depender
+// de um GET /interaction do navegador pegar a sessão viva no instante certo.
+func (s *Server) TitleOnTurnEnd(sessionID string, history []agui.HistoryLine) {
+	if s.deps.Summarizer == nil || len(history) < 2 {
+		return
+	}
+	if s.deps.Store != nil && !s.deps.Store.EngineEnabled("summary", sessionID, false) {
+		return
+	}
+	// só (re)gera quando o histórico avançou o bastante — evita chamadas ao LLM
+	// repetidas quando o fim de turno notifica várias vezes com o mesmo estado.
+	if !s.titles.claim(sessionID, len(history)) {
+		return
+	}
+	atLen := len(history)
+	prompt := agui.ProgressPrompt(historyToEvents(history))
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), progressTimeout)
+		defer cancel()
+		llm, opts := s.summarizerFor("summary", sessionID)
+		out, err := llm.RunHeadless(ctx, prompt, opts)
+		if err != nil {
+			s.titles.release(sessionID)
+			return
+		}
+		if s.deps.Store != nil {
+			_ = s.deps.Store.LogEngineRun(&store.EngineLogEntry{
+				EngineID: "summary", SessionID: sessionID, Trigger: "turn_end",
+				Input: prompt, Output: out,
+			})
+		}
+		title, lines := agui.ParseProgress(out)
+		s.titles.store(sessionID, lines, atLen)
+		if title != "" {
+			_ = s.deps.Store.SetSessionTitle(sessionID, title)
+			s.deps.Bus.Publish(bus.Event{Type: "session.titled", Payload: map[string]any{"id": sessionID}})
+		}
+		s.deps.Bus.Publish(bus.Event{Type: "interaction.changed", Payload: map[string]any{"session_id": sessionID}})
+	}()
+}

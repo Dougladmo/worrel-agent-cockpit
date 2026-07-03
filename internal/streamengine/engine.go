@@ -138,6 +138,7 @@ func (s *Session) SendPrompt(text string) error {
 	line := agui.HistoryLine{Role: "you", Text: text}
 	s.mu.Lock()
 	s.state = agui.StateWorking
+	s.message = ""
 	s.toolCalls = nil
 	s.history = append(s.history, line)
 	s.mu.Unlock()

@@ -43,7 +43,6 @@ export function sessionName(s: Session): string {
 const PROVIDER_CLASS: Record<string, string> = {
   'claude-code': 'sky',
   claude: 'sky',
-  engine: 'sky', // o motor stream-json roda sempre o claude → mesma cor do Claude Code
   opencode: 'amber',
   antigravity: 'green',
   gemini: 'green', // mantido p/ render de sessões antigas (legado, sem custo)
@@ -51,24 +50,37 @@ const PROVIDER_CLASS: Record<string, string> = {
   pidev: 'amber',
 };
 
-// Rótulo amigável por adapter. O adapter "engine" é um marcador INTERNO de
-// roteamento (sessão dirigida pelo motor stream-json, que sempre executa o
-// `claude`) — para o usuário ele é simplesmente o Claude Code.
+// Rótulo amigável por provider.
 const PROVIDER_LABEL: Record<string, string> = {
-  engine: 'Claude Code',
   'claude-code': 'Claude Code',
 };
 
-// providerLabel devolve o nome legível do provider (cai no próprio adapter
+// isEngine indica que a sessão é dirigida pelo motor stream-json. O adapter é
+// um marcador INTERNO de roteamento: "engine" (legado) ou "engine:<provider>".
+export function isEngine(adapter: string): boolean {
+  return adapter === 'engine' || adapter.startsWith('engine:');
+}
+
+// resolveProvider extrai o provider REAL de um adapter. Para sessões de motor,
+// vem no sufixo ("engine:opencode"); "engine" cru (legado) assume claude-code —
+// que era o único driver quando essas sessões foram criadas.
+function resolveProvider(adapter: string): string {
+  if (adapter === 'engine') return 'claude-code';
+  if (adapter.startsWith('engine:')) return adapter.slice('engine:'.length) || 'claude-code';
+  return adapter;
+}
+
+// providerLabel devolve o nome legível do provider (cai no próprio provider
 // quando não há mapeamento específico).
 export function providerLabel(adapter: string): string {
   if (!adapter) return '';
-  return PROVIDER_LABEL[adapter.toLowerCase()] ?? adapter;
+  const p = resolveProvider(adapter);
+  return PROVIDER_LABEL[p.toLowerCase()] ?? p;
 }
 
-// ProviderBadge exibe o adapter como badge categórica (com nome amigável).
+// ProviderBadge exibe o provider como badge categórica (com nome amigável).
 export function ProviderBadge({ adapter }: { adapter: string }) {
   if (!adapter) return null;
-  const cls = PROVIDER_CLASS[adapter.toLowerCase()] ?? '';
+  const cls = PROVIDER_CLASS[resolveProvider(adapter).toLowerCase()] ?? '';
   return <span className={`pill provider-badge ${cls}`.trim()}>{providerLabel(adapter)}</span>;
 }

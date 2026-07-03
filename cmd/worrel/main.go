@@ -168,11 +168,21 @@ func main() {
 	// hook). onChange publica interaction.changed; ao encerrar, fecha a sessão no
 	// store para sair da faixa de vivas da Home.
 	var engineMgr *streamengine.Manager
+	var srv *httpapi.Server
 	engineMgr = streamengine.NewManager(func(id string) {
 		b.Publish(bus.Event{Type: "interaction.changed", Payload: map[string]any{"session_id": id}})
-		if snap, ok := engineMgr.Snapshot(id); ok && snap.State == agui.StateEnded {
+		snap, ok := engineMgr.Snapshot(id)
+		if !ok {
+			return
+		}
+		if snap.State == agui.StateEnded {
 			_ = st.EndSession(id)
 			b.Publish(bus.Event{Type: "session.ended", Payload: map[string]any{"id": id}})
+		}
+		// Fim de turno (o agente parou de responder): gera/atualiza o título
+		// "vivo" server-side, sem depender de o navegador consultar a sessão viva.
+		if snap.State == agui.StateAwaiting && srv != nil {
+			srv.TitleOnTurnEnd(id, snap.History)
 		}
 	}, func(id, role, text string) {
 		// Persiste cada linha do chat (kind="history") para o transcript
@@ -193,7 +203,7 @@ func main() {
 	// cada). Nada roda por default — só motores com __enabled=true na config.
 	go scheduler.New(engines, st).Start(context.Background(), 2*time.Minute)
 
-	srv := httpapi.New(httpapi.Deps{
+	srv = httpapi.New(httpapi.Deps{
 		Store:     st,
 		Mirror:    mir,
 		Bus:       b,

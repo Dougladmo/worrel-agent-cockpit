@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import type { Session, InteractionSnapshot } from '../api';
-import { sessionName } from '../session';
+import { sessionName, isEngine } from '../session';
 import { sessionStatus } from '../sessionStatus';
 
 interface Props {
@@ -58,7 +58,7 @@ function timelineLines(s: Session, snapshot: InteractionSnapshot | undefined, aw
     return snapshot.progress.slice(0, 3).map((text): TimelineEvent => ({ kind: 'neutral', text }));
   // Sessão do motor: o card mostra SÓ os eventos narrados; enquanto não chegam,
   // fica o placeholder — nunca as mensagens cruas trocadas.
-  if (s.adapter === 'engine') return [{ kind: 'neutral', text: fallback }];
+  if (isEngine(s.adapter)) return [{ kind: 'neutral', text: fallback }];
   const lines: TimelineEvent[] = [];
   if (snapshot?.user_message) lines.push({ kind: 'you', text: snapshot.user_message });
   if (snapshot?.message) lines.push({ kind: aiKind(awaitsYou), text: snapshot.message });
@@ -83,7 +83,7 @@ export default function TerminalCard({ session, snapshot, awaiting, suggestions,
   // Sessão clássica: terminal puro (PTY/CLI real), sem o motor de eventos. Não
   // tem snapshot AG-UI (resumo por IA, interrupts, timeline narrada), então o
   // card se reduz ao essencial: título, dica e o botão de abrir o terminal.
-  const classic = session.adapter !== 'engine';
+  const classic = !isEngine(session.adapter);
 
   // A IA espera você quando há interrupt pendente OU o estado é "awaiting".
   const awaitsYou = snapshot

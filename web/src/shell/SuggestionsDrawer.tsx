@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { listSuggestions, listDeferred, acceptSuggestion, rejectSuggestion } from '../api';
 import type { Suggestion, Project, DeferredSession } from '../api';
@@ -10,8 +10,9 @@ interface Props {
   projects: Project[];
   // Sinal para recarregar (ex.: evento suggestion.created).
   reloadKey: number;
-  // Reabre o modal de interação de uma sessão adiada (clique na bolinha).
-  onOpen: (sessionId: string) => void;
+  // Reabre o modal das sessões adiadas de um grupo (clique na bolinha do projeto).
+  // Recebe TODAS as sessões do grupo; o App abre uma de cada vez (fila).
+  onOpen: (sessionIds: string[]) => void;
 }
 
 // SuggestionsDrawer é o sidebar direito, estreito por padrão. Em repouso mostra

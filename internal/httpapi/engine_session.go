@@ -40,7 +40,10 @@ func (s *Server) handleCreateEngineSession(w http.ResponseWriter, r *http.Reques
 
 	sess, err := s.deps.Store.CreateSession(&store.Session{
 		ProjectID: in.ProjectID,
-		Adapter:   "engine", // marca: dirigida pelo motor stream-json
+		// marca: dirigida pelo motor stream-json. Guarda o provider real no
+		// sufixo ("engine:opencode") para a UI rotular corretamente — o motor
+		// não roda só claude. provider já vem normalizado (nunca vazio).
+		Adapter:   "engine:" + provider,
 		Mode:      "wrapper", // entra na faixa de sessões vivas da Home
 	})
 	if err != nil {
