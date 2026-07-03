@@ -118,7 +118,6 @@ func (s *Server) handleInteraction(w http.ResponseWriter, r *http.Request) {
 			backfillUserMessage(&snap)
 			// "Seu pedido" condensado + apresentação rica do que a IA espera.
 			s.attachRequestSummary(&snap)
-			s.attachAskHTML(&snap)
 			writeJSON(w, 200, snap)
 			return
 		}
@@ -136,7 +135,6 @@ func (s *Server) handleInteraction(w http.ResponseWriter, r *http.Request) {
 	snap := agui.Build(id, ended, events, pending)
 	s.attachProgress(&snap, events)
 	s.attachRequestSummary(&snap)
-	s.attachAskHTML(&snap)
 	writeJSON(w, 200, snap)
 }
 
