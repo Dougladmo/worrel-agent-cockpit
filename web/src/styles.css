@@ -1296,10 +1296,12 @@ tr:last-child td { border-bottom: none; }
 
 /* Fila de adiadas: bolinhas readonly (clicar reabre o modal da sessão). */
 .drawer-deferred { display: flex; flex-direction: column; align-items: center; gap: 10px; padding: 14px 0; overflow-y: auto; }
-.deferred-dot { display: inline-flex; align-items: center; justify-content: center; width: 46px; height: 46px; border-radius: 50%; border: 2px solid var(--orange); background: var(--surface-warm); color: var(--ink); font-size: 0.8rem; font-weight: 700; cursor: pointer; transition: transform 0.1s ease; }
+.deferred-dot { position: relative; display: inline-flex; align-items: center; justify-content: center; width: 46px; height: 46px; border-radius: 50%; border: 2px solid var(--orange); background: var(--surface-warm); color: var(--ink); font-size: 0.8rem; font-weight: 700; cursor: pointer; transition: transform 0.1s ease; }
 .deferred-dot:hover { transform: scale(1.08); }
 /* Ocioso (sem pendência): bolinha CINZA, distinta da laranja do Adiar. */
 .deferred-dot[data-kind="idle"] { border-color: var(--muted); background: var(--surface-sunk); color: var(--muted); }
+/* Badge de contagem: nº de sessões adiadas do projeto (só quando >1). */
+.deferred-dot-count { position: absolute; top: -4px; right: -4px; display: inline-flex; align-items: center; justify-content: center; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 9px; background: var(--orange); color: #fff; font-size: 0.65rem; font-weight: 700; line-height: 1; }
 
 /* Retro range picker — dual-handle draggable slider */
 .retro-range { display: flex; flex-direction: column; gap: 0.6rem; }
