@@ -108,6 +108,18 @@ export default function SuggestionsDrawer({ projects, reloadKey, onOpen }: Props
   // Iniciais da sessão p/ a bolinha (rótulo da sessão adiada).
   const initials = (label: string) => (label.trim().slice(0, 2) || '·').toUpperCase();
 
+  // Bolinhas agrupadas por projeto: uma bolinha por projeto com badge de contagem.
+  // Clicar abre todas as sessões adiadas daquele projeto (o App enfileira).
+  const grouped = useMemo(() => {
+    const m = new Map<string, DeferredSession[]>();
+    for (const d of deferred) {
+      const key = d.project_id || '__none';
+      const arr = m.get(key);
+      if (arr) arr.push(d); else m.set(key, [d]);
+    }
+    return Array.from(m.entries());
+  }, [deferred]);
+
   return (
     <aside className={`drawer${showList ? ' drawer-expanded' : ''}`}>
       <div className="drawer-head">
@@ -131,17 +143,28 @@ export default function SuggestionsDrawer({ projects, reloadKey, onOpen }: Props
         </div>
       ) : (
         <div className="drawer-deferred" aria-label={t('drawer.deferred', 'Adiadas')}>
-          {deferred.slice(0, 5).map((d) => (
-            <button
-              key={d.session_id}
-              className="deferred-dot"
-              data-kind={d.kind}
-              title={`${d.label || d.session_id} · ${d.kind === 'idle' ? t('drawer.idleDot', 'ociosa') : t('drawer.deferredDot', 'adiada')}`}
-              onClick={() => onOpen(d.session_id)}
-            >
-              {initials(d.label || d.session_id)}
-            </button>
-          ))}
+          {grouped.slice(0, 5).map(([projectId, sessions]) => {
+            // Uma pergunta pendente (defer) domina o grupo: cor laranja se houver
+            // qualquer 'defer'; senão cinza (só ociosas). Rótulo pelo projeto.
+            const kind = sessions.some((s) => s.kind !== 'idle') ? 'defer' : 'idle';
+            const projName = projectId === '__none'
+              ? (sessions[0].label || sessions[0].session_id)
+              : nameOf(projectId);
+            return (
+              <button
+                key={projectId}
+                className="deferred-dot"
+                data-kind={kind}
+                title={`${projName} · ${sessions.length} ${sessions.length === 1
+                  ? t('drawer.deferredDot', 'adiada')
+                  : t('drawer.deferredDots', 'adiadas')}`}
+                onClick={() => onOpen(sessions.map((s) => s.session_id))}
+              >
+                {initials(projName)}
+                {sessions.length > 1 && <span className="deferred-dot-count">{sessions.length}</span>}
+              </button>
+            );
+          })}
         </div>
       )}
     </aside>
