@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { getInteraction } from '../api';
+import { getInteraction, deferSession } from '../api';
 import type { InteractionSnapshot } from '../api';
 import { useEvents } from '../useEvents';
 import ResponderShell from './ResponderShell';
@@ -33,9 +33,17 @@ export default function GlobalInteractionModal({ sessionId, onClose }: Props) {
     }
   }, [sessionId, load]));
 
+  // Clicar fora do modal ADIA a sessão (vira bolinha no sidebar) em vez de
+  // descartá-la — não se perde a pergunta pendente. Falha (já resolvida/encerrada)
+  // apenas fecha. O evento session.deferred fecha o modal e recarrega o sidebar.
+  const handleBackdropDefer = useCallback(async () => {
+    try { await deferSession(sessionId); } catch { /* já resolvido/encerrado */ }
+    onClose();
+  }, [sessionId, onClose]);
+
   if (!snap) return null;
   return (
-    <ResponderShell onClose={onClose}>
+    <ResponderShell onClose={onClose} onBackdropClick={handleBackdropDefer}>
       <InteractionPanel
         snapshot={snap}
         onActed={load}
