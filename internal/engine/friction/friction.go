@@ -54,6 +54,10 @@ func (e *Engine) Spec() eng.Spec {
 		Config: append([]eng.ConfigField{
 			{Key: "detection_mode", Label: "Modo de detecção", Type: "select", Default: "hybrid", Options: eng.DetectionModeOptions},
 			{Key: "health_consec_failures", Label: "Falhas consecutivas p/ saúde", Type: "number", Default: "2"},
+			{Key: "user_signals", Label: "Sinais de usuário", Type: "select", Default: "off", Options: []eng.ConfigOption{
+				{Value: "off", Label: "Desligado", Description: "Apenas sinais clássicos (erro→retry, passos, saúde)."},
+				{Value: "on", Label: "Ligado", Description: "Também roteia repetição, correção, frustração e cancelamento do usuário (usa LLM fora do modo só-heurística)."},
+			}},
 		}, eng.LLMFields()...),
 		OutputType: "suggestion",
 		DefaultOn:  false,
@@ -72,6 +76,10 @@ func (e *Engine) Run(ctx context.Context, rc eng.RunContext) error {
 	}
 	for _, w := range skill.DetectWorkflows(events) {
 		signals = append(signals, Signal{Kind: w.Signal, Text: windowText(w.Events)})
+	}
+	// sinais centrados no usuário (aditivo; só com o toggle ligado)
+	if rc.Config["user_signals"] == "on" {
+		signals = append(signals, e.collectUserSignals(ctx, rc, events)...)
 	}
 	// 2) passe de saúde: skills com falhas consecutivas >= limiar
 	thr, _ := strconv.Atoi(rc.Config["health_consec_failures"])
@@ -212,6 +220,14 @@ func heuristicRoute(signals []Signal, healthOf map[string]string) []Decision {
 			out = append(out, Decision{Destino: "new", Skill: SkillAction{Title: clip(s.Text), Signature: "heur-" + hashStr(s.Text)}, Evidence: s.Kind})
 		case "health":
 			out = append(out, Decision{Destino: "health", Health: HealthAction{SkillID: healthOf[s.Text], Action: "suspend"}, Evidence: s.Kind})
+		case "user_correction":
+			if s.TargetSkill != "" {
+				out = append(out, Decision{Destino: "refine_skill", Skill: SkillAction{SkillID: s.TargetSkill, Content: s.Text, ChangeSummary: "correção explícita do usuário"}, Evidence: s.Kind})
+			} else {
+				out = append(out, Decision{Destino: "memory", Memory: MemoryAction{Content: s.Text, Category: "never_do"}, Evidence: s.Kind})
+			}
+		case "user_repetition", "user_frustration", "user_cancellation":
+			out = append(out, Decision{Destino: "memory", Memory: MemoryAction{Content: s.Text, Category: "gotcha"}, Evidence: s.Kind})
 		}
 	}
 	return out

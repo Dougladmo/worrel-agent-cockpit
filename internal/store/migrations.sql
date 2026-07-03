@@ -203,3 +203,19 @@ CREATE TABLE IF NOT EXISTS skill_candidates (
   updated_at    INTEGER NOT NULL,
   UNIQUE (project_id, signature)
 );
+-- Intenções do usuário extraídas por LLM (motores user-centric). Cache por
+-- (session_id, seq): a extração só chama o LLM para mensagens ainda não
+-- extraídas. intent_key é a chave canônica (categoria|acao|objeto) usada para
+-- casar recorrência cross-session sem hashear texto livre.
+CREATE TABLE IF NOT EXISTS user_intents (
+  id          TEXT PRIMARY KEY,
+  project_id  TEXT REFERENCES projects(id) ON DELETE CASCADE,
+  session_id  TEXT NOT NULL REFERENCES sessions(id) ON DELETE CASCADE,
+  seq         INTEGER NOT NULL,
+  summary     TEXT NOT NULL DEFAULT '',
+  category    TEXT NOT NULL DEFAULT '',
+  intent_key  TEXT NOT NULL DEFAULT '',
+  created_at  INTEGER NOT NULL,
+  UNIQUE (session_id, seq)
+);
+CREATE INDEX IF NOT EXISTS idx_user_intents_key ON user_intents(project_id, intent_key);

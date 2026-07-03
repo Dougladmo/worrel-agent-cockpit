@@ -47,6 +47,35 @@ Cada motor (`internal/engine/*`) é declarativo: tem id, gatilho, prompts e conf
 
 Gatilhos disponíveis: `on_demand`, `realtime`, `periodic`, `project_open_close`, `agent_self`.
 
+#### Sinais centrados no usuário (`internal/engine/user/`)
+
+Por padrão os motores olham o **output do agente** (erro→retry, passos executados). O pacote `internal/engine/user/` adiciona uma camada centrada no **usuário**, ligada por um toggle **Sinais de usuário** (`off` por padrão) nos motores de **memória** e **fricção**. Quatro detectores:
+
+| Sinal | Como é detectado | Precisa de LLM? |
+|---|---|---|
+| `user_correction` | Marcadores de rejeição/reorientação ("não é isso", "na verdade", "refaz"…) numa mensagem `user/text` após fala do assistente | Não (heurístico) |
+| `user_frustration` | Marcadores de carga emocional inequívoca ("péssimo", "que droga", "perda de tempo"). **Não** dispara em relato factual de bug ("não funciona, deu erro") | Não (heurístico) |
+| `user_cancellation` | `end_reason` real da sessão (morte por sinal / exit 130/143/…) ou marcador de aborto no texto do usuário ("cancela", "chega", "parar") | Não (heurístico) |
+| `user_repetition` | ≥2 mensagens de usuário com a **mesma intenção canônica** na sessão | Sim (via intent key) |
+
+Os marcadores são casados sobre o texto normalizado (minúsculas, sem acentos), evitando a fragilidade de fronteiras de palavra com caracteres acentuados. Toda a detecção heurística roda mesmo no modo `heuristic_only` (custo-zero); só a repetição, que depende da intenção, exige LLM.
+
+#### Intent key canônica
+
+Cada mensagem `user/text` é destilada por LLM numa **intenção** `{summary, category, action, object}`, reduzida a uma **chave canônica** `categoria|ação|objeto` (normalizada). É essa chave — **nunca um hash do texto livre** — que casa recorrência entre sessões: "criar rota GET /users" e "criar uma rota para listar usuários" colapsam em `criacao|criar|rota` e são reconhecidas como a mesma tarefa.
+
+A extração é **batch por sessão** (uma chamada LLM para todas as mensagens novas) e **cacheada** na tabela `user_intents` com `UNIQUE (session_id, seq)`: reexecuções do motor sobre a mesma sessão não re-chamam o LLM. `store.FindSimilarIntents` recupera intenções do projeto pela chave.
+
+#### Como cada motor consome
+
+| Motor | Consumo |
+|---|---|
+| **memory** | Com o toggle ligado, além do atrito clássico, gera golden truths **por tipo de sinal** (construtor dedicado — não reusa o de tool_use): correção→`never_do`, frustração/repetição/cancelamento→`gotcha` |
+| **skill** | Novo `signature_mode`: `tool_use_hash` (default, atual) ou `intent_summary`. Neste, a assinatura do candidato vira `intent:<chave canônica>` da mensagem que liderou a janela — então o acúmulo cross-session matura por **intenção**, não por ferramentas executadas |
+| **friction** | Com o toggle ligado, coleta os sinais `user_*` e os roteia: repetição/frustração/cancelamento→`memory`; correção→`refine_skill` quando há `target_skill` (a única skill usada na sessão), senão `memory`. O prompt do roteador LLM conhece os novos tipos |
+
+Sem ciclos de import: a janela (`user.Window`) e a `Intent` vivem no pacote `user`; o tipo persistido (`store.UserIntent`) vive no `store`, que **não** importa `user`.
+
 <details>
 <summary><b>Evolução de skills</b> — tipos, linhagem e modo automático</summary>
 

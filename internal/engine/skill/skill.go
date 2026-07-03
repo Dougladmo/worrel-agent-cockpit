@@ -56,6 +56,7 @@ func (e *Engine) Spec() eng.Spec {
 		Config: append([]eng.ConfigField{
 			{Key: "detection_mode", Label: "Modo de detecção", Type: "select", Default: "hybrid", Options: eng.DetectionModeOptions},
 			{Key: "maturation_threshold", Label: "Sessões p/ maturar", Type: "number", Default: "2"},
+			signatureModeField(),
 		}, eng.LLMFields()...),
 		OutputType: "suggestion",
 		DefaultOn:  false,
@@ -116,6 +117,19 @@ func (e *Engine) Run(ctx context.Context, rc eng.RunContext) error {
 		drafts, err = NewDistiller(hl, model).Distill(ctx, windows, candidates, skillPrompt, agentPrompt)
 		if err != nil {
 			return err
+		}
+	}
+
+	// Modo intent_summary: substitui a assinatura (que seria hash de ferramentas)
+	// pela chave canônica da intenção do usuário que liderou cada janela. Alinhado
+	// por índice (drafts do modo heurístico são 1:1 com as janelas). Assim a
+	// recorrência cross-session passa a casar por INTENÇÃO, não por ferramentas.
+	if rc.Config["signature_mode"] == "intent_summary" && mode != "llm_full" {
+		keys := e.windowIntentKeys(ctx, rc, windows, events)
+		for i := range drafts {
+			if i < len(keys) && keys[i] != "" {
+				drafts[i].Signature = "intent:" + keys[i]
+			}
 		}
 	}
 

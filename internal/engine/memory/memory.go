@@ -47,6 +47,7 @@ func (e *Engine) Spec() eng.Spec {
 				{Value: "always_inject", Label: "Sempre injetar", Description: "A memória é injetada automaticamente no início de cada sessão (vira o primer)."},
 				{Value: "on_demand", Label: "Sob demanda", Description: "Não injeta; o agente busca a memória via MCP (get_memory) quando precisar."},
 			}},
+			userSignalsField(),
 		}, eng.LLMFields()...),
 		OutputType: "suggestion",
 		DefaultOn:  false,
@@ -85,13 +86,24 @@ func (e *Engine) Run(ctx context.Context, rc eng.RunContext) error {
 	default: // hybrid
 		windows := DetectFriction(events)
 		if len(windows) == 0 {
-			return nil
+			// Sem atrito clássico: ainda assim segue para os sinais de usuário
+			// (abaixo) quando o toggle estiver ligado; senão encerra.
+			if rc.Config["user_signals"] != "on" {
+				return nil
+			}
+			break
 		}
 		hl, model := e.llm(rc.Config)
 		truths, err = NewLLMDistiller(hl, prompt, model).Distill(ctx, windows, current)
 		if err != nil {
 			return err
 		}
+	}
+
+	// Sinais centrados no usuário (aditivo aos modos clássicos): só quando o
+	// toggle user_signals está ligado, para preservar custo-zero no modo padrão.
+	if rc.Config["user_signals"] == "on" {
+		truths = append(truths, e.userCentricTruths(ctx, rc, events)...)
 	}
 
 	validIDs := map[string]bool{}

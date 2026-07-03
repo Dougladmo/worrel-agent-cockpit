@@ -21,3 +21,6 @@ npm/platforms/*/bin/
 # brainstorm mockups (visual companion)
 .superpowers/
 docs/superpowers/
+
+# binário local de build
+/worrel

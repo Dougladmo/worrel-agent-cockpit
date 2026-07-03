@@ -14,10 +14,16 @@ type Headless interface {
 	RunHeadless(ctx context.Context, prompt string, opts adapter.HeadlessOpts) (string, error)
 }
 
-// Signal é um sinal de atrito coletado dos detectores (SP3/SP4) ou da saúde.
+// Signal é um sinal de atrito coletado dos detectores (SP3/SP4), da saúde ou dos
+// detectores centrados no usuário (user_*).
 type Signal struct {
-	Kind string `json:"kind"` // error_then_success | user_steps | health
+	Kind string `json:"kind"` // error_then_success | user_steps | health | user_repetition | user_correction | user_frustration | user_cancellation
 	Text string `json:"text"`
+	// IntentKey: chave canônica da intenção, quando o sinal é centrado no usuário.
+	IntentKey string `json:"intent_key,omitempty"`
+	// TargetSkill: skill_id a que uma correção do usuário provavelmente se refere
+	// (fonte: única skill usada na sessão — ver SkillsUsedInSession).
+	TargetSkill string `json:"target_skill,omitempty"`
 }
 
 type MemoryAction struct {
@@ -61,6 +67,12 @@ func NewRouter(h Headless, model string) *Router { return &Router{h: h, model: m
 func (r *Router) Route(ctx context.Context, signals []Signal, contextStr string) ([]Decision, error) {
 	var b strings.Builder
 	b.WriteString(`Você é o ROTEADOR de atrito. Para cada sinal, escolha o DESTINO e preencha o sub-objeto correspondente. destino ∈ {memory, new, refine_skill, refine_agent, health}. memory=fato anti-erro isolado. new=fluxo dirigido recorrente (preencha skill.title+signature). refine_skill=melhorar uma skill existente (skill.skill_id+content+change_summary). refine_agent=melhorar um agente existente (agent.target_agent_id+persona+change_summary). health=skill falhando (health.skill_id+action). Use os IDs existentes do contexto; não invente.`)
+	b.WriteString(`
+Sinais centrados no usuário e destino sugerido:
+- user_repetition (usuário pediu a mesma coisa várias vezes) → memory (registre o que faltou na 1ª resposta).
+- user_correction (usuário corrigiu/rejeitou o agente) → refine_skill se houver target_skill no sinal; senão memory.
+- user_frustration (frustração explícita) → memory (prioridade alta).
+- user_cancellation (usuário abortou o agente) → memory.`)
 	b.WriteString("\n\n## Contexto atual (memória, skills, agents, candidatos)\n")
 	b.WriteString(contextStr)
 	b.WriteString("\n\n## Sinais de atrito\n")
