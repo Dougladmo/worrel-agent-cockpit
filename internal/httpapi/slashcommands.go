@@ -40,9 +40,18 @@ func (s *Server) routesSlashCommands() {
 			writeJSON(w, 200, empty)
 			return
 		}
+		// dir só é aceito quando é o workspace de uma sessão real: senão qualquer
+		// caminho do disco teria seu <dir>/.claude/commands lido e devolvido.
+		// dir desconhecido degrada para nível de usuário (~/.claude).
+		dir := r.URL.Query().Get("dir")
+		if dir != "" && s.deps.Store != nil {
+			if known, _ := s.deps.Store.IsSessionWorkspaceDir(dir); !known {
+				dir = ""
+			}
+		}
 		ctx, cancel := context.WithTimeout(r.Context(), 10*time.Second)
 		defer cancel()
-		cmds, err := lister.ListSlashCommands(ctx, r.URL.Query().Get("dir"))
+		cmds, err := lister.ListSlashCommands(ctx, dir)
 		if cmds == nil {
 			cmds = []adapter.SlashCommand{}
 		}

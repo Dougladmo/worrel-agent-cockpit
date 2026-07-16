@@ -38,7 +38,7 @@ export default function SlashCommandMenu({ items, activeIndex, onSelect }: Props
     <div className="slash-menu" role="listbox" ref={menuRef}>
       {items.map((it, i) => (
         <button
-          key={it.label}
+          key={`${it.kind}:${it.label}`}
           ref={i === activeIndex ? activeRef : null}
           type="button"
           role="option"

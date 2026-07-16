@@ -64,7 +64,7 @@ export function isEngine(adapter: string): boolean {
 // resolveProvider extrai o provider REAL de um adapter. Para sessões de motor,
 // vem no sufixo ("engine:opencode"); "engine" cru (legado) assume claude-code —
 // que era o único driver quando essas sessões foram criadas.
-function resolveProvider(adapter: string): string {
+export function resolveProvider(adapter: string): string {
   if (adapter === 'engine') return 'claude-code';
   if (adapter.startsWith('engine:')) return adapter.slice('engine:'.length) || 'claude-code';
   return adapter;

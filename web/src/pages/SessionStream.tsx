@@ -10,7 +10,7 @@ import {
 import type { InteractionSnapshot, HistoryLine } from '../api';
 import { useEvents } from '../useEvents';
 import { useDraft } from '../useDraft';
-import { providerLabel } from '../session';
+import { providerLabel, resolveProvider } from '../session';
 import SlashCommandMenu from '../components/SlashCommandMenu';
 import { filterSlashItems } from '../components/slashCommands';
 import type { SlashItem } from '../components/slashCommands';
@@ -50,22 +50,28 @@ export default function SessionStream() {
   );
   const menuOpen = menuQuery !== null && filtered.length > 0;
 
-  // Carrega as fontes uma vez por sessão. Resolve projeto/working dir via
-  // listActiveSessions; degrada para nível de usuário quando a sessão não é ativa.
+  // Carrega as fontes uma vez por sessão. Resolve projeto/working dir e o
+  // PROVIDER REAL via listActiveSessions; degrada para nível de usuário quando a
+  // sessão não é ativa.
   useEffect(() => {
     if (!id) return;
     let cancelled = false;
     (async () => {
       let projectId = '';
       let dir = '';
+      let provider = '';
       try {
         const s = (await listActiveSessions()).find((x) => x.id === id);
-        if (s) { projectId = s.project_id || ''; dir = s.workspace_dir || ''; }
+        if (s) { projectId = s.project_id || ''; dir = s.workspace_dir || ''; provider = resolveProvider(s.adapter); }
       } catch { /* sessão encerrada/sem contexto: segue só com nível de usuário */ }
+      // Comandos vêm do provider REAL da sessão: opencode/codex não implementam a
+      // capacidade → lista vazia (degradação graciosa). Skills/agents são assets
+      // do Claude Code (~/.claude), então só entram numa sessão claude-code.
+      const isClaude = provider === 'claude-code';
       const [cmds, skills, agents] = await Promise.all([
-        listSlashCommands('claude-code', dir).catch(() => []),
-        listSkills(projectId || undefined).catch(() => []),
-        projectId ? listAgents(projectId).catch(() => []) : Promise.resolve([]),
+        provider ? listSlashCommands(provider, dir).catch(() => []) : Promise.resolve([]),
+        isClaude ? listSkills(projectId || undefined).catch(() => []) : Promise.resolve([]),
+        isClaude && projectId ? listAgents(projectId).catch(() => []) : Promise.resolve([]),
       ]);
       if (cancelled) return;
       setSlashItems([

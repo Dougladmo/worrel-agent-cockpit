@@ -353,3 +353,16 @@ func (s *Store) SetSessionWorkspaceDir(id, dir string) error {
 	_, err := s.db.Exec(`UPDATE sessions SET workspace_dir=? WHERE id=?`, dir, id)
 	return err
 }
+
+// IsSessionWorkspaceDir informa se dir é o workspace de alguma sessão conhecida.
+// Usado para restringir a varredura de comandos de projeto (?dir=) a workspaces
+// reais — sem isso, um dir arbitrário faria o servidor ler <dir>/.claude de
+// qualquer caminho do disco.
+func (s *Store) IsSessionWorkspaceDir(dir string) (bool, error) {
+	if dir == "" {
+		return false, nil
+	}
+	var n int
+	err := s.db.QueryRow(`SELECT COUNT(1) FROM sessions WHERE workspace_dir=?`, dir).Scan(&n)
+	return n > 0, err
+}
